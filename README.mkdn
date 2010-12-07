@@ -1,0 +1,2 @@
+To use this script. Simply run it on your Music library directory. The
+help text (`rganalysis.py --help`) contains all you need to know.
