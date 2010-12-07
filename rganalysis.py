@@ -531,7 +531,11 @@ def getitem_or_none(obj, key):
 #     return bin_by_keys(files, key_functions)
 
 def parse_options():
-    parser = optparse.OptionParser(usage='%prog [music directories]...', version='%prog 0.1')
+    epilog_text = \
+"""This program will add replaygain tags to all the music files in the
+directories that you specify.
+"""
+    parser = optparse.OptionParser(usage='%prog [music directories]...', version='%prog 0.1', epilog=epilog_text)
     parser.add_option('--force-reanalyze', help='Reanalyze all files and recalculate replaygain values, even if the files already have valid replaygain tags. Normally, only files without replaygain tags will be analyzed.', action='store_true', dest='reanalyze')
     parser.add_option('--no-force-reanalyze', help='Only files without preexisting replaygain tags will be analyzed. This is the default.', action='store_false', dest='reanalyze')
     parser.add_option('--ignore-hidden', help='Ignore hidden files and directories. This is the default.', action='store_true', dest='ignore_hidden')
