@@ -1,2 +1,30 @@
 To use this script, simply run it on your Music library directory. The
-help text (`rganalysis.py --help`) contains all you need to know.
+help text (`rganalysis.py --help`) contains all you need to know:
+
+    Usage: rganalysis.py [music directories]...
+
+    Options:
+      --version             show program's version number and exit
+      -h, --help            show this help message and exit
+      --force-reanalyze     Reanalyze all files and recalculate replaygain     values,
+                            even if the files already have valid replaygain     tags.
+                            Normally, only files without replaygain tags will     be
+                            analyzed.
+      --no-force-reanalyze  Only files without preexisting replaygain tags     will be
+                            analyzed. This is the default.
+      --ignore-hidden       Ignore hidden files and directories. This is the
+                            default.
+      --no-ignore-hidden    Do not ignore hidden files and directories, or
+                            otherwise treat them differently from other files.
+      --gain-type=TYPE      Can be "album", "track", or "auto". If "track",     only
+                            track gain values will be calculated, and album     gain
+                            values will be erased. if "album", both track and
+                            album gain values will be calculated. If "auto",     then
+                            "album" mode will be used except in directories     that
+                            contain a file called "TRACKGAIN" or ".TRACKGAIN".     In
+                            these directories, "track" mode will be used. The
+                            default setting is "auto".
+
+    This program will add replaygain tags to all the music files in the
+    directories that you specify.
+
