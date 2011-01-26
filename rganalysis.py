@@ -13,7 +13,6 @@
 import sys
 import os
 import re
-import optparse
 from os.path import realpath
 import math
 
@@ -148,6 +147,10 @@ class RGTrackSet(object):
         self.description = self.RGTracks.itervalues().next().trackset_key_string
         self.directory = self.key[2]
         self.gain_type = gain_type
+        if self.has_valid_rgdata():
+            self.analyzed = True
+        else:
+            self.analyzed = False
 
     @classmethod
     def MakeTrackSets(cls, tracks):
@@ -206,11 +209,6 @@ class RGTrackSet(object):
         def fget(self):
             return sorted(self.RGTracks.keys())
 
-    # @Property
-    # def type():
-    #     def fget(self):
-    #         return type(self.RGTracks.itervalues().next().track)
-
     @Property
     def num_tracks():
         def fget(self):
@@ -267,17 +265,17 @@ class RGTrackSet(object):
         if gain_type:
             self.gain_type = gain_type
 
-        if not force:
-            if not self.has_valid_rgdata():
-                print 'Track set "%s" must be re-analyzed.' % (self.description)
-                force = True
-
-        # Only want album gain for real albums, not single tracks
-
         if force:
+            self.analyzed = False
+
+        if self.analyzed:
+            print 'Skipping track set "%s", which is already analyzed.' % (self.description)
+        else:
+            print 'Track set "%s" must be re-analyzed.' % (self.description)
+
+            # Only want album gain for real albums, not single tracks
             print 'Analyzing "%s"' % (self.description)
             rgdata = Analyzer(self.filenames).data
-            self.changed = True
             if self.want_album_gain():
                 self.gain = rgdata['album_gain']
                 self.peak = rgdata['album_peak']
@@ -288,8 +286,8 @@ class RGTrackSet(object):
                 rgtrack = self.RGTracks[filename]
                 rgtrack.gain = rgdata['track_gain'][filename]
                 rgtrack.peak = rgdata['track_peak'][filename]
-        else:
-            print 'Skipping track set "%s", which is already analyzed.' % (self.description)
+            self.changed = True
+            self.analyzed = True
 
     def is_multitrack_album(self):
         '''Returns True if this track set represents at least two
@@ -338,20 +336,30 @@ class RGTrackSet(object):
                 # print "Don't want album gain, and we don't have it. Ok."
                 return True
 
-    def save(self):
+    def report(self):
+        """Report calculated replay gain tags."""
+        for k in sorted(self.filenames):
+            track = self.RGTracks[k]
+            print "Set track gain tags for %s:" % (track.filename,)
+            print "\tTrack Gain: %s" % (track.gain,)
+            print "\tTrack Peak: %s" % (track.peak,)
+        if self.want_album_gain():
+            print "Set album gain tags for %s:" % (self.description,)
+            print "\tAlbum Gain: %s" % (self.gain,)
+            print "\tAlbum Peak: %s" % (self.peak,)
+        else:
+            print "Did not set album gain tags for %s." % (self.description,)
+
+    def save(self, dry_run=False):
+        """Save the calculated replaygain tags"""
+        if not self.analyzed:
+            raise Exception('Track set "%s" must be analyzed before saving' % (self.description,))
+        self.report()
         if self.changed:
-            for k in self.filenames:
-                track = self.RGTracks[k]
-                track.save()
-                print "Set track gain tags for %s:" % (track.filename,)
-                print "\tTrack Gain: %s" % (track.gain,)
-                print "\tTrack Peak: %s" % (track.peak,)
-            if self.want_album_gain():
-                print "Set album gain tags for %s:" % (self.description,)
-                print "\tAlbum Gain: %s" % (self.gain,)
-                print "\tAlbum Peak: %s" % (self.peak,)
-            else:
-                print "Did not set album gain tags for %s." % (self.description,)
+            if not dry_run:
+                for k in self.filenames:
+                    track = self.RGTracks[k]
+                    track.save()
             self.changed = False
 
 class RGTrack(object):
@@ -479,33 +487,6 @@ def get_all_music_files (paths, ignore_hidden=True):
     # Filter duplicate files and return
     return(unique(music_files, key_fun=lambda x: x['~filename']))
 
-## Old binning logic
-# def bin_by_keys(items, key_functions):
-#     '''Separate items into bins based on the value of several keys,
-#     which are determined by applying each of key_functions to each
-#     item.
-
-#     Returns a dict of lists. Each key is a tuple of the same length as
-#     key_functions. The corresponding value is a list of all items that
-#     have all those key values.'''
-#     bins = {}
-#     for i in items:
-#         k = tuple([ f(i) for f in key_functions ])
-#         if bins.has_key(k):
-#             bins[k].append(i)
-#         else:
-#             bins[k] = [i,]
-#     return(bins)
-
-# # def bin_by_album(files):
-# #     '''Separate a list of AudioFile objects into individual albums.
-
-# #     Returns a dict of lists of AudioFiles.'''
-# #     return(bin_by_key(files, lambda f: f.album_key))
-
-# # def bin_by_filetype(files):
-# #     return bin_by_key(files, lambda f: type(f))
-
 def getitem_or_none(obj, key):
     '''Same as obj[key] except that if the key does not exist, it
     returns None instead of raising a KeyError.'''
@@ -514,61 +495,57 @@ def getitem_or_none(obj, key):
     except KeyError:
         return None
 
-# def bin_by_replaygain_group(files):
-#     '''Separate files into replaygain groups.
-
-#     A "replaygain groups" is a set of files that should be considered a
-#     "set" for calculating audiophile gain. This could be an album, but
-#     it could also be a single disc of a multi-disc album.
-
-#     Returns a dict, the values of which are the groups, and the keys
-#     of which are the uniquely-identiifying characteristics of the
-#     group. You mostly care about the values.'''
-#     key_functions = (lambda x: x.album_key,
-#                      lambda x: getitem_or_none(x, 'discnumber'),
-#                      lambda x: os.path.dirname(x['~filename']),
-#                      lambda x: type(x),)
-#     return bin_by_keys(files, key_functions)
-
-def parse_options():
-    epilog_text = \
-"""This program will add replaygain tags to all the music files in the
+if __name__ == "__main__":
+    import plac
+    @plac.annotations(
+        # arg=(helptext, kind, abbrev, type, choices, metavar)
+        force_reanalyze=('Reanalyze all files and recalculate replaygain values, even if the files already have valid replaygain tags. Normally, only files without replaygain tags will be analyzed.',
+                         "flag", "f"),
+        include_hidden=('Do not skip hidden files and directories, or otherwise treat them differently from normal files.',
+                        "flag", "i"),
+        gain_type=('Can be "album", "track", or "auto". If "track", only track gain values will be calculated, and album gain values will be erased. if "album", both track and album gain values will be calculated. If "auto", then "album" mode will be used except in directories that contain a file called "TRACKGAIN" or ".TRACKGAIN". In these directories, "track" mode will be used. The default setting is "auto".',
+                   "option", "g", str, ('album', 'track', 'auto')),
+        dry_run=("Don't modify any files. Only analyze and report gain.",
+                 "flag", "n"),
+        )
+    def main(force_reanalyze, include_hidden, dry_run, gain_type='auto', *music_directories):
+        """This program will add replaygain tags to all the music files in the
 directories that you specify.
 """
-    parser = optparse.OptionParser(usage='%prog [music directories]...', version='%prog 0.1', epilog=epilog_text)
-    parser.add_option('--force-reanalyze', help='Reanalyze all files and recalculate replaygain values, even if the files already have valid replaygain tags. Normally, only files without replaygain tags will be analyzed.', action='store_true', dest='reanalyze')
-    parser.add_option('--no-force-reanalyze', help='Only files without preexisting replaygain tags will be analyzed. This is the default.', action='store_false', dest='reanalyze')
-    parser.add_option('--ignore-hidden', help='Ignore hidden files and directories. This is the default.', action='store_true', dest='ignore_hidden')
-    parser.add_option('--no-ignore-hidden', help='Do not ignore hidden files and directories, or otherwise treat them differently from other files.', action='store_false', dest='ignore_hidden')
-    parser.add_option('--gain-type', help='Can be "album", "track", or "auto". If "track", only track gain values will be calculated, and album gain values will be erased. if "album", both track and album gain values will be calculated. If "auto", then "album" mode will be used except in directories that contain a file called "TRACKGAIN" or ".TRACKGAIN". In these directories, "track" mode will be used. The default setting is "auto".', action='store', dest='gain_type', metavar='TYPE', choices=['album', 'track', 'auto'])
-    parser.set_defaults(reanalyze=False, ignore_hidden=True, gain_type='auto')
-    (options, args) = parser.parse_args()
-    if len(args) == 0:
-        args = ( os.getcwd(), )
-    return (options, args)
+        if dry_run:
+            print 'This script is running in "dry run" mode, so no files will actually be modified.'
 
-if __name__ == "__main__":
-    (options, args) = parse_options()
-    # This import is here because it needs to happen after
-    # command-line arg parsing.
-    import gst
-    print "Searching for music files"
-    tracks = [ RGTrack(f) for f in get_all_music_files(args, ignore_hidden=options.ignore_hidden) ]
-    albums = RGTrackSet.MakeTrackSets(tracks)
-    total_length = sum([len(a) for a in albums])
+        if len(music_directories) == 0:
+            print "You did not specify any music directories or files. Exiting."
+            exit()
+        print "Searching for music files in the following directories:\n%s" % ("\n".join(music_directories),)
+        tracks = [ RGTrack(f) for f in get_all_music_files(music_directories, ignore_hidden=(not include_hidden)) ]
+        if len(tracks) == 0:
+            print "Failed to find any tracks in the directories you specified. Exiting."
+            exit()
+        albums = RGTrackSet.MakeTrackSets(tracks)
 
-    # For display purposes, calculate how much granularity is required
-    # to show visible progress at each update
-    min_step = min([len(a) for a in albums])
-    places_past_decimal = max(0,int(math.ceil(-math.log10(min_step * 100.0 / total_length))))
-    update_string = '%.' + str(places_past_decimal) + 'f%% done'
-    processed_length = 0
-    percent_done = 0
-    print "Beginning analysis"
-    for a in albums:
-        a.analyze(force=options.reanalyze, gain_type=options.gain_type)
-        a.save()
-        processed_length = processed_length + len(a)
-        percent_done = 100.0 * processed_length / total_length
-        print update_string % (percent_done, )
-    print "Analysis complete."
+        # For display purposes, calculate how much granularity is required
+        # to show visible progress at each update
+        total_length = sum([len(a) for a in albums])
+        min_step = min([len(a) for a in albums])
+        places_past_decimal = max(0,int(math.ceil(-math.log10(min_step * 100.0 / total_length))))
+        update_string = '%.' + str(places_past_decimal) + 'f%% done'
+        processed_length = 0
+        percent_done = 0
+
+        print "Beginning analysis"
+        import gst
+        for a in albums:
+            a.analyze(force=force_reanalyze, gain_type=gain_type)
+            if dry_run:
+                a.report()
+            else:
+                a.save()
+            processed_length = processed_length + len(a)
+            percent_done = 100.0 * processed_length / total_length
+            print update_string % (percent_done, )
+        print "Analysis complete."
+        if dry_run:
+            print 'This script ran in "dry run" mode, so no files were actually modified.'
+    plac.call(main)
