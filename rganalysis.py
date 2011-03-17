@@ -120,6 +120,7 @@ class Analyzer(object):
         pad.unlink(self.convert.get_pad("sink"))
 
     def bus_message_tag(self, bus, message):
+        import gst
         if message.src != self.analysis:
             return
         tags = message.parse_tag()
