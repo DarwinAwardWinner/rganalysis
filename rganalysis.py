@@ -57,6 +57,12 @@ class Analyzer(object):
         # This import is here because it needs to happen after
         # command-line arg parsing.
         import gst
+
+        # This is a long-running script, so some files can change
+        # while it's running. Therefore, skip files that have become
+        # inaccessible.
+        files = [ f for f in files if os.access(f, os.R_OK) ]
+
         self.pipe = gst.Pipeline("pipe")
 
         self.filesrc = gst.element_factory_make("filesrc", "source")
