@@ -30,8 +30,6 @@ quodlibet.config.init()
 
 from quodlibet.formats import MusicFile
 
-#from pprint import pprint
-
 def Property(function):
     keys = 'fget', 'fset', 'fdel'
     func_locals = {'doc':function.__doc__}
