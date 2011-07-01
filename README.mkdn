@@ -1,5 +1,8 @@
+# rganalysis.py: Add Replay Gain tags to your whole music library
+
 To use this script, simply run it on your Music library directory. The
-help text (`rganalysis.py --help`) contains all you need to know:
+help text (`rganalysis.py --help`) contains (almost) all you need to
+know:
 
 <pre><code>
 usage: rganalysis.py [-h] [-f] [-i] [-n] [-g auto]
@@ -31,3 +34,21 @@ optional arguments:
                         these directories, "track" mode will be used. The
                         default setting is "auto".
 </pre></code>
+
+## What is an album?
+
+When doing "album" or "audiophile" Replay Gain tags, one needs to
+carefully define an album. For example, if you happen to have half an
+album in FLAC format and the other half in MP3, they might be at
+different volumes to begin with, so calculating Replay Gain tags on
+the whole album is a bad thing -- the MP3s will end up too loud and
+the FLACs too quiet, or vice versa.
+
+Anyway, this script considers two tracks to belong to the same "track
+set" for the purposes of calculating audiophile gain if:
+* They have the same album name tag
+* They have the same disc number tag (or lack thereof)
+* They are in the same directory on the filesystem
+* They are both the same music format (MP3, OGG, FLAC, etc.)
+
+I may add "same album artist" to this list in the future
