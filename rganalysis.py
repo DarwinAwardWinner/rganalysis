@@ -395,11 +395,13 @@ class RGTrack(object):
     @Property
     def trackset_key_string():
         '''A human-readable string representation of the track_set_key.
-        Unlike the key itself, this is not guaranteed to distinguish
-        between track sets.'''
+
+        Unlike the key itself, this is not guaranteed to uniquely
+        identify a track set.'''
         def fget(self):
-            (album_key, disc, directory, filetype) = self.track_set_key
-            album = album_key[0]
+            album = self.track("albumsort", "")
+            (disc, directory, filetype) = self.track_set_key[1:]
+
             if album == '':
                 key_string = "No album"
             else:
