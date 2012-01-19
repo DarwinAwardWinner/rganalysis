@@ -367,13 +367,18 @@ class RGTrackSet(object):
                     track.save()
             self.changed = False
 
+def decode_filename(f):
+    if isinstance(f, str):
+        f = f.decode(sys.getfilesystemencoding())
+    return f
+
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
     for replaygain information.'''
 
     _track_set_key_functions = (lambda x: x.album_key,
                                 lambda x: getitem_or_none(x, 'discnumber'),
-                                lambda x: os.path.dirname(x['~filename']),
+                                lambda x: decode_filename(os.path.dirname(x['~filename'])),
                                 lambda x: type(x),)
 
     def __init__(self, track):
