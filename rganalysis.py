@@ -546,6 +546,14 @@ def main(force_reanalyze=False, include_hidden=False,
     logging.info("Searching for music files in the following directories:\n%s", ("\n".join(music_directories),))
     tracks = [ track_class(f) for f in get_all_music_files(music_directories, ignore_hidden=(not include_hidden)) ]
 
+    # Filter out tracks for which we can't get the length
+    for t in tracks[:]:
+        try:
+            len(t)
+        except:
+            logging.error("Track %s appears to be invalid. Skipping.", t.filename)
+            tracks.remove(t)
+
     if len(tracks) == 0:
         logging.error("Failed to find any tracks in the directories you specified. Exiting.")
         exit()
@@ -563,11 +571,14 @@ def main(force_reanalyze=False, include_hidden=False,
     logging.info("Beginning analysis")
     import gst
     for a in albums:
-        a.analyze(force=force_reanalyze, gain_type=gain_type)
-        if dry_run:
-            a.report()
-        else:
+        try:
+            a.analyze(force=force_reanalyze, gain_type=gain_type)
+        except:
+            logging.error("Failed to analyze %s. Skipping.", a.description)
+        try:
             a.save()
+        except:
+            logging.error("Failed to save %s. Skipping", a.description)
         processed_length = processed_length + len(a)
         percent_done = 100.0 * processed_length / total_length
         logging.info(update_string, (percent_done, ))
