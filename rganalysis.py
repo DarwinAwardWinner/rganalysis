@@ -543,7 +543,7 @@ def main(force_reanalyze=False, include_hidden=False,
         logging.error("You did not specify any music directories or files. Exiting.")
         exit()
 
-    logging.info("Searching for music files in the following directories:\n%s", ("\n".join(music_directories),))
+    logging.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
     tracks = [ track_class(f) for f in get_all_music_files(music_directories, ignore_hidden=(not include_hidden)) ]
 
     # Filter out tracks for which we can't get the length
@@ -581,7 +581,7 @@ def main(force_reanalyze=False, include_hidden=False,
             logging.error("Failed to save %s. Skipping", a.description)
         processed_length = processed_length + len(a)
         percent_done = 100.0 * processed_length / total_length
-        logging.info(update_string, (percent_done, ))
+        logging.info(update_string, percent_done)
     logging.info("Analysis complete.")
     if dry_run:
         logging.warn('This script ran in "dry run" mode, so no files were actually modified.')
