@@ -150,9 +150,9 @@ class RGTrackSet(object):
     track_gain_signal_filenames = ('TRACKGAIN', '.TRACKGAIN', '_TRACKGAIN')
 
     def __init__(self, tracks, gain_type="auto"):
-        self.RGTracks = dict([ (t.filename, t) for t in tracks])
+        self.RGTracks = dict((t.filename, t) for t in tracks)
         self.changed = False
-        keys = set([ t.track_set_key for t in self.RGTracks.values() ])
+        keys = set(t.track_set_key for t in self.RGTracks.values())
         if (len(keys) == 1):
             self.key = keys.pop()
         else:
@@ -191,7 +191,7 @@ class RGTrackSet(object):
                 return False
             elif self.gain_type == "auto":
                 # Check for track gain signal files
-                return not any([os.path.exists(os.path.join(self.directory, f)) for f in self.track_gain_signal_filenames])
+                return not any(os.path.exists(os.path.join(self.directory, f)) for f in self.track_gain_signal_filenames)
             else:
                 raise TypeError('RGTrackSet.gain_type must be either "track", "album", or "auto"')
         else:
@@ -233,7 +233,7 @@ class RGTrackSet(object):
     @Property
     def length_seconds():
         def fget(self):
-            return sum([t.length_seconds for t in self.RGTracks.itervalues()])
+            return sum(t.length_seconds for t in self.RGTracks.itervalues())
 
     def __len__(self):
         return self.length_seconds
@@ -247,7 +247,7 @@ class RGTrackSet(object):
         In particular, note that None and False have different
         meanings.'''
         try:
-            tags = set([t.track[tag] for t in self.RGTracks.itervalues()])
+            tags = set(t.track[tag] for t in self.RGTracks.itervalues())
             if len(tags) == 1:
                 return tags.pop()
             elif len(tags) > 1:
@@ -377,7 +377,7 @@ class RGTrack(object):
 
     def __init__(self, track):
         self.track = track
-        self.track_set_key = tuple([ f(self.track) for f in self._track_set_key_functions ])
+        self.track_set_key = tuple(f(self.track) for f in self._track_set_key_functions)
 
     def __repr__(self):
         return "RGTrack(%s)" % (repr(self.track), )
@@ -478,7 +478,7 @@ def unique (items, key_fun = None):
     if key_fun is None:
         return(list(set(items)))
     else:
-        return(dict([(key_fun(i), i) for i in items]).values())
+        return(dict((key_fun(i), i) for i in items).values())
 
 def get_all_music_files (paths, ignore_hidden=True):
     '''Recursively search in one or more paths for music files.
@@ -493,8 +493,8 @@ def get_all_music_files (paths, ignore_hidden=True):
                     dirs = remove_hidden_paths(dirs)
                 # Try to load every file as an audio file, and filter the
                 # ones that aren't actually audio files
-                more_files = [ MusicFile(os.path.join(root, x)) for x in files ]
-                music_files.extend([ f for f in more_files if f is not None ])
+                more_files = ( MusicFile(os.path.join(root, x)) for x in files )
+                music_files.extend( f for f in more_files if f is not None )
         else:
             f = MusicFile(p)
             if f is not None:
@@ -561,8 +561,8 @@ def main(force_reanalyze=False, include_hidden=False,
 
     # For display purposes, calculate how much granularity is required
     # to show visible progress at each update
-    total_length = sum([len(a) for a in albums])
-    min_step = min([len(a) for a in albums])
+    total_length = sum(len(a) for a in albums)
+    min_step = min(len(a) for a in albums)
     places_past_decimal = max(0,int(math.ceil(-math.log10(min_step * 100.0 / total_length))))
     update_string = '%.' + str(places_past_decimal) + 'f%% done'
     processed_length = 0
