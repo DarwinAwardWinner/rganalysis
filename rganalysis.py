@@ -157,7 +157,7 @@ class RGTrackSet(object):
             self.key = keys.pop()
         else:
             raise ValueError("All tracks in an album must have the same key")
-        self.description = self.RGTracks.itervalues().next().trackset_key_string
+        self.description = next(self.RGTracks.itervalues()).trackset_key_string
         self.directory = self.key[2]
         self.gain_type = gain_type
         if self.has_valid_rgdata():
