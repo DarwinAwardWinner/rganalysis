@@ -46,6 +46,7 @@ the FLACs too quiet, or vice versa.
 
 Anyway, this script considers two tracks to belong to the same "track
 set" for the purposes of calculating audiophile gain if:
+
 * They have the same album name tag
 * They have the same disc number tag (or lack thereof)
 * They are in the same directory on the filesystem
