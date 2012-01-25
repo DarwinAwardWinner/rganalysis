@@ -288,9 +288,8 @@ class RGTrackSet(object):
         if self.analyzed:
             logging.info('Skipping track set "%s", which is already analyzed.', self.description)
         else:
-            logging.info('Track set "%s" must be re-analyzed.', self.description)
             # Only want album gain for real albums, not single tracks
-            logging.info('Analyzing "%s"', self.description)
+            logging.info('Analyzing track set "%s"', self.description)
             rgdata = Analyzer(self.filenames).data
             if self.want_album_gain():
                 self.gain = rgdata['album_gain']
