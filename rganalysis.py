@@ -567,11 +567,16 @@ def main(force_reanalyze=False, include_hidden=False,
         try:
             a.analyze(force=force_reanalyze, gain_type=gain_type)
         except:
-            logging.error("Failed to analyze %s. Skipping.", a.description)
+            import traceback
+            logging.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", a.description, traceback.format_exc())
         try:
-            a.save()
+            if a.analyzed:
+                a.save()
+            else:
+                logging.error("Not saving %s because it was not analyzed successfully." % a.description)
         except:
-            logging.error("Failed to save %s. Skipping", a.description)
+            import traceback
+            logging.error("Failed to save %s. Skipping. The exception was:\n\n%s\n", a.description, traceback.format_exc())
         processed_length = processed_length + len(a)
         percent_done = 100.0 * processed_length / total_length
         logging.info(update_string, percent_done)
