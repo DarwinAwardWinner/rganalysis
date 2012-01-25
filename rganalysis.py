@@ -266,6 +266,7 @@ class RGTrackSet(object):
 
     def _del_tag(self, tag):
         '''Delete tag from all tracks in the album.'''
+        logging.debug("Deleting %s in all tracks in %s of type %s", tag, self.name, self.type)
         for t in self.RGTracks.itervalues():
             try:
                 del t.track[tag]
