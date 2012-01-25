@@ -372,7 +372,7 @@ class RGTrack(object):
     for replaygain information.'''
 
     _track_set_key_functions = (lambda x: x.album_key,
-                                lambda x: getitem_or_none(x, 'discnumber'),
+                                lambda x: x.get('discnumber'),
                                 lambda x: decode_filename(os.path.dirname(x['~filename'])),
                                 lambda x: type(x),)
 
@@ -503,14 +503,6 @@ def get_all_music_files (paths, ignore_hidden=True):
 
     # Filter duplicate files and return
     return(unique(music_files, key_fun=lambda x: x['~filename']))
-
-def getitem_or_none(obj, key):
-    '''Same as obj[key] except that if the key does not exist, it
-    returns None instead of raising a KeyError.'''
-    try:
-        return obj[key]
-    except KeyError:
-        return None
 
 @plac.annotations(
     # arg=(helptext, kind, abbrev, type, choices, metavar)
