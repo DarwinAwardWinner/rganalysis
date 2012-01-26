@@ -18,6 +18,7 @@ import os
 import re
 from os.path import realpath
 import math
+import traceback
 
 # Needed for making threads work for pygst, or something. Why doesn't
 # pygst take care of this itself?
@@ -32,6 +33,16 @@ import quodlibet.config
 quodlibet.config.init()
 
 from quodlibet.formats import MusicFile
+
+from itertools import imap
+import multiprocessing
+from multiprocessing.pool import Pool
+
+def default_job_count():
+    try:
+        return multiprocessing.cpu_count()
+    except:
+        return 1
 
 def decode_filename(f):
     if isinstance(f, str):
@@ -517,6 +528,33 @@ def get_all_music_files (paths, ignore_hidden=True):
     # Filter duplicate files and return
     return(unique(music_files, key_fun=lambda x: x['~filename']))
 
+class TrackSetHandler(object):
+    """Pickleable stateful callable for multiprocessing.Pool.imap"""
+    def __init__(self, force=False, gain_type="auto"):
+        self.force = force
+        self.gain_type = gain_type
+    def __call__(self, track_set):
+        try:
+            track_set.analyze(force=self.force, gain_type=self.gain_type)
+        except:
+            logging.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
+
+        try:
+            if track_set.analyzed:
+                track_set.save()
+            else:
+                logging.error("Not saving %s because it was not analyzed successfully." % track_set.track_set_key_string)
+        except:
+            logging.error("Failed to save %s. Skipping. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
+        return track_set
+
+def positive_int(x):
+    i = int(x)
+    if i < 1:
+        raise ValueError()
+    else:
+        return i
+
 @plac.annotations(
     # arg=(helptext, kind, abbrev, type, choices, metavar)
     force_reanalyze=('Reanalyze all files and recalculate replaygain values, even if the files already have valid replaygain tags. Normally, only files without replaygain tags will be analyzed.', "flag", "f"),
@@ -526,11 +564,13 @@ def get_all_music_files (paths, ignore_hidden=True):
     dry_run=("Don't modify any files. Only analyze and report gain.",
         "flag", "n"),
     music_directories=("Directories in which to search for music files.", "positional"),
+    jobs=("Number of albums to analyze in parallel. The default is the number of cores detected on your system.", "option", "j", positive_int),
     quiet=("Do not print informational messages.", "flag", "q"),
     verbose=("Print debug messages that are probably only useful if something is going wrong.", "flag", "v"),
     )
 def main(force_reanalyze=False, include_hidden=False,
          dry_run=False, gain_type='auto',
+         jobs=default_job_count(),
          quiet=False, verbose=False,
          *music_directories
          ):
@@ -563,37 +603,47 @@ def main(force_reanalyze=False, include_hidden=False,
     if len(tracks) == 0:
         logging.error("Failed to find any tracks in the directories you specified. Exiting.")
         exit()
-    albums = RGTrackSet.MakeTrackSets(tracks)
+    track_sets = RGTrackSet.MakeTrackSets(tracks)
+
+    logging.info("Beginning analysis")
+    handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type)
 
     # For display purposes, calculate how much granularity is required
     # to show visible progress at each update
-    total_length = sum(len(a) for a in albums)
-    min_step = min(len(a) for a in albums)
+    total_length = sum(len(ts) for ts in track_sets)
+    min_step = min(len(ts) for ts in track_sets)
     places_past_decimal = max(0,int(math.ceil(-math.log10(min_step * 100.0 / total_length))))
     update_string = '%.' + str(places_past_decimal) + 'f%% done'
-    processed_length = 0
-    percent_done = 0
 
-    logging.info("Beginning analysis")
+
+
     import gst
-    for a in albums:
-        try:
-            a.analyze(force=force_reanalyze, gain_type=gain_type)
-        except:
-            import traceback
-            logging.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", a.description, traceback.format_exc())
-        try:
-            if a.analyzed:
-                a.save()
-            else:
-                logging.error("Not saving %s because it was not analyzed successfully." % a.description)
-        except:
-            import traceback
-            logging.error("Failed to save %s. Skipping. The exception was:\n\n%s\n", a.description, traceback.format_exc())
-        processed_length = processed_length + len(a)
-        percent_done = 100.0 * processed_length / total_length
-        logging.info(update_string, percent_done)
-    logging.info("Analysis complete.")
+    pool = None
+    try:
+        if jobs == 1:
+            # Sequential
+            handled_track_sets = imap(handler, track_sets)
+        else:
+            # Parallel
+            pool = Pool(jobs)
+            handled_track_sets = pool.imap_unordered(handler,track_sets)
+        processed_length = 0
+        percent_done = 0
+        for ts in handled_track_sets:
+            processed_length = processed_length + len(ts)
+            percent_done = 100.0 * processed_length / total_length
+            logging.info(update_string, percent_done)
+        logging.info("Analysis complete.")
+    except KeyboardInterrupt:
+        logging.error("Canceled.")
+        if pool is not None:
+            logging.debug("Terminating process pool")
+            pool.terminate()
+            pool = None
+    finally:
+        if pool is not None:
+            logging.debug("Closing transcode process pool")
+            pool.close()
     if dry_run:
         logging.warn('This script ran in "dry run" mode, so no files were actually modified.')
     pass
