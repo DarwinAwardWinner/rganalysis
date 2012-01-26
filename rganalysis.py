@@ -597,7 +597,7 @@ def main(force_reanalyze=False, include_hidden=False,
         track_class = RGTrackDryRun
     if len(music_directories) == 0:
         logging.error("You did not specify any music directories or files. Exiting.")
-        exit()
+        sys.exit(1)
 
     logging.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
     tracks = [ track_class(f) for f in get_all_music_files(music_directories, ignore_hidden=(not include_hidden)) ]
@@ -612,7 +612,7 @@ def main(force_reanalyze=False, include_hidden=False,
 
     if len(tracks) == 0:
         logging.error("Failed to find any tracks in the directories you specified. Exiting.")
-        exit()
+        sys.exit(1)
     track_sets = RGTrackSet.MakeTrackSets(tracks)
 
     logging.info("Beginning analysis")
