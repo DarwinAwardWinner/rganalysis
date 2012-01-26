@@ -42,7 +42,7 @@ from multiprocessing.pool import Pool
 def default_job_count():
     try:
         return multiprocessing.cpu_count()
-    except:
+    except Exception:
         return 1
 
 def decode_filename(f):
@@ -537,7 +537,7 @@ class TrackSetHandler(object):
     def __call__(self, track_set):
         try:
             track_set.analyze(force=self.force, gain_type=self.gain_type)
-        except:
+        except Exception:
             logging.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
 
         try:
@@ -545,7 +545,7 @@ class TrackSetHandler(object):
                 track_set.save()
             else:
                 logging.error("Not saving %s because it was not analyzed successfully." % track_set.track_set_key_string)
-        except:
+        except Exception:
             logging.error("Failed to save %s. Skipping. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
         return track_set
 
@@ -606,7 +606,7 @@ def main(force_reanalyze=False, include_hidden=False,
     for t in tracks[:]:
         try:
             len(t)
-        except:
+        except Exception:
             logging.error("Track %s appears to be invalid. Skipping.", t.filename)
             tracks.remove(t)
 
