@@ -156,12 +156,8 @@ class RGTrackSet(object):
             raise ValueError("Need at least one track to analyze")
         self.changed = False
         keys = set(t.track_set_key for t in self.RGTracks.values())
-        if (len(keys) == 1):
-            self.key = keys.pop()
-        else:
+        if (len(keys) != 1):
             raise ValueError("All tracks in an album must have the same key")
-        self.description = next(self.RGTracks.itervalues()).trackset_key_string
-        self.directory = self.key[2]
         self.gain_type = gain_type
         if self.has_valid_rgdata():
             self.analyzed = True
@@ -238,6 +234,21 @@ class RGTrackSet(object):
         def fget(self):
             return sum(t.length_seconds for t in self.RGTracks.itervalues())
 
+    @Property
+    def track_set_key():
+        def fget(self):
+            return next(self.RGTracks.itervalues()).track_set_key
+
+    @Property
+    def track_set_key_string():
+        def fget(self):
+            return next(self.RGTracks.itervalues()).track_set_key_string
+
+    @Property
+    def directory():
+        def fget(self):
+            return self.track_set_key[2]
+
     def __len__(self):
         return self.length_seconds
 
@@ -262,13 +273,13 @@ class RGTrackSet(object):
 
     def _set_tag(self, tag, value):
         '''Set tag to value in all tracks in the album.'''
-        logging.debug("Setting %s to %s in all tracks in %s", tag, value, self.track_set_key)
+        logging.debug("Setting %s to %s in all tracks in %s.", tag, value, self.track_set_key_string)
         for t in self.RGTracks.itervalues():
             t.track[tag] = str(value)
 
     def _del_tag(self, tag):
         '''Delete tag from all tracks in the album.'''
-        logging.debug("Deleting %s in all tracks in %s ", tag, self.track_set_key)
+        logging.debug("Deleting %s in all tracks in %s.", tag, self.track_set_key_string)
         for t in self.RGTracks.itervalues():
             try:
                 del t.track[tag]
@@ -289,10 +300,10 @@ class RGTrackSet(object):
             self.analyzed = False
 
         if self.analyzed:
-            logging.info('Skipping track set "%s", which is already analyzed.', self.description)
+            logging.info('Skipping track set "%s", which is already analyzed.', self.track_set_key_string)
         else:
             # Only want album gain for real albums, not single tracks
-            logging.info('Analyzing track set "%s"', self.description)
+            logging.info('Analyzing track set "%s"', self.track_set_key_string)
             rgdata = Analyzer(self.filenames).data
             if self.want_album_gain():
                 self.gain = rgdata['album_gain']
@@ -315,7 +326,7 @@ class RGTrackSet(object):
         - the album consists of only one track;
         - the album is actually a collection of tracks that do not
           belong to any album.'''
-        if len(self.RGTracks) <= 1 or self.key[0:1] is ('',''):
+        if len(self.RGTracks) <= 1 or self.track_set_key[0:1] is ('',''):
             return False
         else:
             return True
@@ -354,14 +365,14 @@ class RGTrackSet(object):
             track = self.RGTracks[k]
             logging.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain, track.peak)
         if self.want_album_gain():
-            logging.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.description, self.gain, self.peak)
+            logging.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string, self.gain, self.peak)
         else:
-            logging.info("Did not set album gain tags for %s.", self.description)
+            logging.info("Did not set album gain tags for %s.", self.track_set_key_string)
 
     def save(self):
         """Save the calculated replaygain tags"""
         if not self.analyzed:
-            raise Exception('Track set "%s" must be analyzed before saving' % (self.description,))
+            raise Exception('Track set "%s" must be analyzed before saving' % (self.track_set_key_string,))
         self.report()
         if self.changed:
             for k in self.filenames:
@@ -398,7 +409,7 @@ class RGTrack(object):
             self.track['~filename'] = value
 
     @Property
-    def trackset_key_string():
+    def track_set_key_string():
         '''A human-readable string representation of the track_set_key.
 
         Unlike the key itself, this is not guaranteed to uniquely
@@ -589,7 +600,11 @@ def main(force_reanalyze=False, include_hidden=False,
 
 # Entry point
 def plac_call_main():
-    return plac.call(main)
+    try:
+        return plac.call(main)
+    except KeyboardInterrupt:
+        logging.error("Canceled.")
+        sys.exit(1)
 
 if __name__=="__main__":
     plac_call_main()
