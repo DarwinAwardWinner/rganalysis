@@ -650,6 +650,7 @@ def main(force_reanalyze=False, include_hidden=False,
             logging.debug("Terminating process pool")
             pool.terminate()
             pool = None
+        raise
     finally:
         if pool is not None:
             logging.debug("Closing transcode process pool")
