@@ -124,7 +124,7 @@ class Analyzer(object):
                     break
 
             self.analysis.set_locked_state(False)
-            logging.info("Finished analysis of %s tracks." % len(files))
+        logging.info("Finished analysis of %s tracks." % len(files))
 
     def new_decoded_pad(self, dbin, pad, islast):
         pad.link(self.convert.get_pad("sink"))
