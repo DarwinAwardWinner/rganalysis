@@ -646,7 +646,6 @@ def main(force_reanalyze=False, include_hidden=False,
             logging.info(update_string, percent_done)
         logging.info("Analysis complete.")
     except KeyboardInterrupt:
-        logging.error("Canceled.")
         if pool is not None:
             logging.debug("Terminating process pool")
             pool.terminate()
