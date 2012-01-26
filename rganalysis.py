@@ -19,6 +19,7 @@ import re
 from os.path import realpath
 import math
 import traceback
+import signal
 
 # Needed for making threads work for pygst, or something. Why doesn't
 # pygst take care of this itself?
@@ -581,6 +582,15 @@ def main(force_reanalyze=False, include_hidden=False,
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
+
+    # Some pesky functions used below will catch KeyboardInterrupts
+    # inappropriately, so install an alternate handler that bypasses
+    # KeyboardInterrupt instead.
+    def signal_handler(sig, frame):
+        print "Canceled."
+        os.kill(os.getpid(), signal.SIGTERM)
+    original_handler = signal.signal(signal.SIGINT, signal_handler)
+
     track_class = RGTrack
     if dry_run:
         logging.warn('This script is running in "dry run" mode, so no files will actually be modified.')
@@ -620,6 +630,8 @@ def main(force_reanalyze=False, include_hidden=False,
     import gst
     pool = None
     try:
+        # Remove the earlier bypass of KeyboardInterrupt
+        signal.signal(signal.SIGINT, original_handler)
         if jobs == 1:
             # Sequential
             handled_track_sets = imap(handler, track_sets)
