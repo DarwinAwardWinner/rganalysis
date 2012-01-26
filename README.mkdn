@@ -5,26 +5,26 @@ help text (`rganalysis.py --help`) contains (almost) all you need to
 know:
 
 <pre><code>
-usage: rganalysis.py [-h] [-f] [-i] [-n] [-g auto]
+usage: rganalysis.py [-h] [-f] [-i] [-n] [-g auto] [-j 2] [-q] [-v]
                      [music_directories [music_directories ...]]
 
-This program will add replaygain tags to all the music files in the
-directories that you specify.
+Add replaygain tags to your music files.
 
 positional arguments:
-  music_directories
+  music_directories     Directories in which to search for music files.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f, --force_reanalyze
+  -f, --force-reanalyze, --force_reanalyze
                         Reanalyze all files and recalculate replaygain values,
                         even if the files already have valid replaygain tags.
                         Normally, only files without replaygain tags will be
                         analyzed.
-  -i, --include_hidden  Do not skip hidden files and directories, or otherwise
-                        treat them differently from normal files.
-  -n, --dry_run         Don't modify any files. Only analyze and report gain.
-  -g auto, --gain_type auto
+  -i, --include-hidden, --include_hidden
+                        Do not skip hidden files and directories.
+  -n, --dry-run, --dry_run
+                        Don't modify any files. Only analyze and report gain.
+  -g auto, --gain-type auto, --gain_type auto
                         Can be "album", "track", or "auto". If "track", only
                         track gain values will be calculated, and album gain
                         values will be erased. if "album", both track and
@@ -33,6 +33,11 @@ optional arguments:
                         contain a file called "TRACKGAIN" or ".TRACKGAIN". In
                         these directories, "track" mode will be used. The
                         default setting is "auto".
+  -j 2, --jobs 2        Number of albums to analyze in parallel. The default
+                        is the number of cores detected on your system.
+  -q, --quiet           Do not print informational messages.
+  -v, --verbose         Print debug messages that are probably only useful if
+                        something is going wrong.
 </pre></code>
 
 ## What is an album?
