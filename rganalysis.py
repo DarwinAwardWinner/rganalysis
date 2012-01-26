@@ -615,6 +615,9 @@ def main(force_reanalyze=False, include_hidden=False,
         sys.exit(1)
     track_sets = RGTrackSet.MakeTrackSets(tracks)
 
+    # Remove the earlier bypass of KeyboardInterrupt
+    signal.signal(signal.SIGINT, original_handler)
+
     logging.info("Beginning analysis")
     handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type)
 
@@ -625,13 +628,9 @@ def main(force_reanalyze=False, include_hidden=False,
     places_past_decimal = max(0,int(math.ceil(-math.log10(min_step * 100.0 / total_length))))
     update_string = '%.' + str(places_past_decimal) + 'f%% done'
 
-
-
     import gst
     pool = None
     try:
-        # Remove the earlier bypass of KeyboardInterrupt
-        signal.signal(signal.SIGINT, original_handler)
         if jobs == 1:
             # Sequential
             handled_track_sets = imap(handler, track_sets)
