@@ -152,6 +152,8 @@ class RGTrackSet(object):
 
     def __init__(self, tracks, gain_type="auto"):
         self.RGTracks = dict((t.filename, t) for t in tracks)
+        if len(self.RGTracks) < 1:
+            raise ValueError("Need at least one track to analyze")
         self.changed = False
         keys = set(t.track_set_key for t in self.RGTracks.values())
         if (len(keys) == 1):
