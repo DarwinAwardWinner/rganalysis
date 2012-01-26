@@ -260,13 +260,13 @@ class RGTrackSet(object):
 
     def _set_tag(self, tag, value):
         '''Set tag to value in all tracks in the album.'''
-        logging.debug("Setting %s to %s in all tracks in %s of type %s", tag, value, self.name, self.type)
+        logging.debug("Setting %s to %s in all tracks in %s", tag, value, self.track_set_key name)
         for t in self.RGTracks.itervalues():
             t.track[tag] = str(value)
 
     def _del_tag(self, tag):
         '''Delete tag from all tracks in the album.'''
-        logging.debug("Deleting %s in all tracks in %s of type %s", tag, self.name, self.type)
+        logging.debug("Deleting %s in all tracks in %s ", tag, self.track_set_key name)
         for t in self.RGTracks.itervalues():
             try:
                 del t.track[tag]
