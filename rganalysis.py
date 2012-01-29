@@ -398,7 +398,7 @@ class RGTrack(object):
 
     _track_set_key_functions = (lambda x: x.album_key,
                                 lambda x: x.get('discnumber'),
-                                lambda x: decode_filename(os.path.dirname(x['~filename'])),
+                                lambda x: os.path.dirname(decode_filename(x['~filename'])),
                                 lambda x: type(x),)
 
     def __init__(self, track):
@@ -416,7 +416,7 @@ class RGTrack(object):
     @Property
     def filename():
         def fget(self):
-            return self.track['~filename']
+            return decode_filename(self.track['~filename'])
         def fset(self, value):
             self.track['~filename'] = value
 
