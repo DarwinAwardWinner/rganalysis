@@ -58,3 +58,10 @@ set" for the purposes of calculating audiophile gain if:
 * They are both the same music format (MP3, OGG, FLAC, etc.)
 
 I may add "same album artist" to this list in the future
+
+## See also
+
+[Transfercoder](https://github.com/DarwinAwardWinner/transfercoder), a
+tool for transferring your music to your portable mp3 player while
+simultaneously transcoding music formats that the player doesn't
+recognize.
