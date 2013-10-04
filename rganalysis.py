@@ -259,7 +259,7 @@ class RGTrackSet(object):
     @Property
     def directory():
         def fget(self):
-            return self.track_set_key[2]
+            return self.track_set_key[1]
 
     def __len__(self):
         return self.length_seconds
