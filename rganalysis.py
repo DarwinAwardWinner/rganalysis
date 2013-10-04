@@ -397,7 +397,6 @@ class RGTrack(object):
     for replaygain information.'''
 
     _track_set_key_functions = (lambda x: x.album_key,
-                                lambda x: x.get('discnumber'),
                                 lambda x: os.path.dirname(decode_filename(x['~filename'])),
                                 lambda x: type(x),)
 
@@ -428,14 +427,12 @@ class RGTrack(object):
         identify a track set.'''
         def fget(self):
             album = self.track("albumsort", "")
-            (disc, directory, filetype) = self.track_set_key[1:]
+            (directory, filetype) = self.track_set_key[1:]
 
             if album == '':
                 key_string = "No album"
             else:
                 key_string = album
-                if disc:
-                    key_string += " Disc %s" % (disc,)
             key_string += " in directory %s" % (directory,)
             key_string += " of type %s" % (re.sub("File$","",filetype.__name__),)
             return key_string
