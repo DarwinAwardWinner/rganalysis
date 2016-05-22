@@ -319,12 +319,17 @@ class RGTrack(object):
         identify a track set.'''
         def fget(self):
             album = self.track("albumsort", "")
+            disc = self.track("discnumber", "")
             (directory, filetype) = self.track_set_key[1:]
 
             if album == '':
                 key_string = "No album"
             else:
                 key_string = album
+            if disc == '':
+                pass
+            else:
+                key_string += " Disc " + disc
             key_string += " in directory %s" % (directory,)
             key_string += " of type %s" % (re.sub("File$","",filetype.__name__),)
             return key_string
