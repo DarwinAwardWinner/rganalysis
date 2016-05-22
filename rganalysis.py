@@ -90,6 +90,107 @@ def Property(function):
     function()
     return property(**func_locals)
 
+class RGTrack(object):
+    '''Represents a single track along with methods for analyzing it
+    for replaygain information.'''
+
+    _track_set_key_functions = (lambda x: x.album_key,
+                                lambda x: os.path.dirname(decode_filename(x['~filename'])),
+                                lambda x: type(x),)
+
+    def __init__(self, track):
+        self.track = track
+        self.track_set_key = tuple(f(self.track) for f in self._track_set_key_functions)
+
+    def __repr__(self):
+        return "RGTrack(%s)" % (repr(self.track), )
+
+    def has_valid_rgdata(self):
+        '''Returns True if the track has valid replay gain tags. The
+        tags are not checked for accuracy, only existence.'''
+        return self.gain and self.peak
+
+    @Property
+    def filename():
+        def fget(self):
+            return decode_filename(self.track['~filename'])
+        def fset(self, value):
+            self.track['~filename'] = value
+
+    @Property
+    def track_set_key_string():
+        '''A human-readable string representation of the track_set_key.
+
+        Unlike the key itself, this is not guaranteed to uniquely
+        identify a track set.'''
+        def fget(self):
+            album = self.track("albumsort", "")
+            disc = self.track("discnumber", "")
+            (directory, filetype) = self.track_set_key[1:]
+
+            if album == '':
+                key_string = "No album"
+            else:
+                key_string = album
+            if disc == '':
+                pass
+            else:
+                key_string += " Disc " + disc
+            key_string += " in directory %s" % (directory,)
+            key_string += " of type %s" % (re.sub("File$","",filetype.__name__),)
+            return key_string
+
+    @Property
+    def gain():
+        doc = "Track gain value, or None if the track does not have replaygain tags."
+        tag = 'replaygain_track_gain'
+        def fget(self):
+            try:
+                return(self.track[tag])
+            except KeyError:
+                return None
+        def fset(self, value):
+            logging.debug("Setting %s to %s for %s" % (tag, value, self.filename))
+            self.track[tag] = str(value)
+        def fdel(self):
+            if self.track.has_key(tag):
+                del self.track[tag]
+
+    @Property
+    def peak():
+        doc = "Track peak dB, or None if the track does not have replaygain tags."
+        tag = 'replaygain_track_peak'
+        def fget(self):
+            try:
+                return(self.track[tag])
+            except KeyError:
+                return None
+        def fset(self, value):
+            logging.debug("Setting %s to %s for %s" % (tag, value, self.filename))
+            self.track[tag] = str(value)
+        def fdel(self):
+            if self.track.has_key(tag):
+                del self.track[tag]
+
+    @Property
+    def length_seconds():
+        def fget(self):
+            return self.track['~#length']
+
+    def __len__(self):
+        return self.length_seconds
+
+    def save(self):
+        #print 'Saving "%s" in %s' % (os.path.basename(self.filename), os.path.dirname(self.filename))
+        self.track.write()
+
+class RGTrackDryRun(RGTrack):
+    """Same as RGTrack, but the save() method does nothing.
+
+    This means that the file will never be modified."""
+    def save(self):
+        pass
+
 class RGTrackSet(object):
     '''Represents and album and supplies methods to analyze the tracks in that album for replaygain information, as well as store that information in the tracks.'''
 
@@ -225,7 +326,7 @@ class RGTrackSet(object):
                 del t.track[tag]
             except KeyError: pass
 
-    def do_gain(self, force=False, gain_type=None, dry_run=False, replaygain_path="replaygain"):
+    def do_gain(self, force=False, gain_type=None, dry_run=False, verbose=False, replaygain_path="replaygain"):
         """Analyze all tracks in the album, and add replay gain tags
         to the tracks based on the analysis.
 
@@ -252,7 +353,8 @@ class RGTrackSet(object):
         logging.debug("Executing command: %s", repr(cmd))
         output = check_output(cmd)
         # Print the output all at once to minimize the chance of interleaving
-        print output
+        if verbose:
+            print output
 
     def is_multitrack_album(self):
         '''Returns True if this track set represents at least two
@@ -283,107 +385,6 @@ class RGTrackSet(object):
         for k in self.filenames:
             track = self.RGTracks[k]
             track.save()
-
-class RGTrack(object):
-    '''Represents a single track along with methods for analyzing it
-    for replaygain information.'''
-
-    _track_set_key_functions = (lambda x: x.album_key,
-                                lambda x: os.path.dirname(decode_filename(x['~filename'])),
-                                lambda x: type(x),)
-
-    def __init__(self, track):
-        self.track = track
-        self.track_set_key = tuple(f(self.track) for f in self._track_set_key_functions)
-
-    def __repr__(self):
-        return "RGTrack(%s)" % (repr(self.track), )
-
-    def has_valid_rgdata(self):
-        '''Returns True if the track has valid replay gain tags. The
-        tags are not checked for accuracy, only existence.'''
-        return self.gain and self.peak
-
-    @Property
-    def filename():
-        def fget(self):
-            return decode_filename(self.track['~filename'])
-        def fset(self, value):
-            self.track['~filename'] = value
-
-    @Property
-    def track_set_key_string():
-        '''A human-readable string representation of the track_set_key.
-
-        Unlike the key itself, this is not guaranteed to uniquely
-        identify a track set.'''
-        def fget(self):
-            album = self.track("albumsort", "")
-            disc = self.track("discnumber", "")
-            (directory, filetype) = self.track_set_key[1:]
-
-            if album == '':
-                key_string = "No album"
-            else:
-                key_string = album
-            if disc == '':
-                pass
-            else:
-                key_string += " Disc " + disc
-            key_string += " in directory %s" % (directory,)
-            key_string += " of type %s" % (re.sub("File$","",filetype.__name__),)
-            return key_string
-
-    @Property
-    def gain():
-        doc = "Track gain value, or None if the track does not have replaygain tags."
-        tag = 'replaygain_track_gain'
-        def fget(self):
-            try:
-                return(self.track[tag])
-            except KeyError:
-                return None
-        def fset(self, value):
-            # print "Setting %s to %s for %s" % (tag, value, self.filename)
-            self.track[tag] = str(value)
-        def fdel(self):
-            if self.track.has_key(tag):
-                del self.track[tag]
-
-    @Property
-    def peak():
-        doc = "Track peak dB, or None if the track does not have replaygain tags."
-        tag = 'replaygain_track_peak'
-        def fget(self):
-            try:
-                return(self.track[tag])
-            except KeyError:
-                return None
-        def fset(self, value):
-            # print "Setting %s to %s for %s" % (tag, value, self.filename)
-            self.track[tag] = str(value)
-        def fdel(self):
-            if self.track.has_key(tag):
-                del self.track[tag]
-
-    @Property
-    def length_seconds():
-        def fget(self):
-            return self.track['~#length']
-
-    def __len__(self):
-        return self.length_seconds
-
-    def save(self):
-        #print 'Saving "%s" in %s' % (os.path.basename(self.filename), os.path.dirname(self.filename))
-        self.track.write()
-
-class RGTrackDryRun(RGTrack):
-    """Same as RGTrack, but the save() method does nothing.
-
-    This means that the file will never be modified."""
-    def save(self):
-        pass
 
 def remove_hidden_paths(paths):
     '''Remove UNIX-style hidden paths from a list.'''
@@ -426,15 +427,17 @@ def get_all_music_files (paths, ignore_hidden=True):
 
 class TrackSetHandler(object):
     """Pickleable stateful callable for multiprocessing.Pool.imap"""
-    def __init__(self, force=False, gain_type="auto", dry_run=False, replaygain_path="replaygain"):
+    def __init__(self, force=False, gain_type="auto", dry_run=False, verbose=False,
+                 replaygain_path="replaygain"):
         self.force = force
         self.gain_type = gain_type
         self.dry_run = dry_run
         self.replaygain_path = replaygain_path
     def __call__(self, track_set):
         try:
-            track_set.do_gain(force=self.force, gain_type=self.gain_type, dry_run=self.dry_run,
-                              replaygain_path=self.replaygain_path)
+            track_set.do_gain(
+                force=self.force, gain_type=self.gain_type, dry_run=self.dry_run,
+                verbose=False, replaygain_path=self.replaygain_path)
         except Exception:
             logging.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
         return track_set
@@ -479,7 +482,7 @@ def main(force_reanalyze=False, include_hidden=False,
     # inappropriately, so install an alternate handler that bypasses
     # KeyboardInterrupt instead.
     def signal_handler(sig, frame):
-        print "Canceled."
+        logging.error("Canceled.")
         os.kill(os.getpid(), signal.SIGTERM)
     original_handler = signal.signal(signal.SIGINT, signal_handler)
 
@@ -513,7 +516,7 @@ def main(force_reanalyze=False, include_hidden=False,
 
     logging.info("Beginning analysis")
 
-    handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run)
+    handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run, verbose=verbose)
 
     # For display purposes, calculate how much granularity is required
     # to show visible progress at each update
@@ -522,7 +525,6 @@ def main(force_reanalyze=False, include_hidden=False,
     places_past_decimal = max(0,int(math.ceil(-math.log10(min_step * 100.0 / total_length))))
     update_string = '%.' + str(places_past_decimal) + 'f%% done'
 
-    # import gst
     pool = None
     try:
         if jobs == 1:
