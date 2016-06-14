@@ -40,6 +40,12 @@ optional arguments:
                         something is going wrong.
 </pre></code>
 
+Note that you need the 'rgain' python module installed, with the
+accompanying `replaygain` script in your `$PATH`. (This script doesn't
+currently import the rgain module despite both being python, since it
+was easier to implement by having it call the script instead. Patches
+fixing this are welcome.)
+
 ## What is an album?
 
 When doing "album" or "audiophile" Replay Gain tags, one needs to
