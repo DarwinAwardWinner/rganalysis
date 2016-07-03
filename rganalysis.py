@@ -10,38 +10,41 @@
 # it under the terms of version 2 (or later) of the GNU General Public
 # License as published by the Free Software Foundation.
 
-import plac
+from __future__ import print_function
+
 import logging
-
-import sys
-import os
-import re
-from os.path import realpath
 import math
-import traceback
-import signal
-
-# You must initialize the quodlibet config before tag editing will
-# work correctly
-import quodlibet.config
-quodlibet.config.init()
-
-from quodlibet.formats import MusicFile
-
-from itertools import imap
 import multiprocessing
-from multiprocessing.pool import Pool
+import os
+import os.path
+import plac
+import re
+import signal
+import sys
+import traceback
 
+from contextlib import contextmanager
+from itertools import imap, ifilter
+from multiprocessing.pool import Pool
+from mutagen import File as MusicFile
+from mutagen.aac import AACError
+from mutagen.easyid3 import EasyID3
+from mutagen.easymp4 import EasyMP4Tags
 from subprocess import check_output
 
-# http://stackoverflow.com/a/22434262/125921
-from contextlib import contextmanager
+try:
+    from tqdm import tqdm
+except ImportError:
+    # Fallback: No progress bars
+    def tqdm(iterable, *args, **kwargs):
+        return iterable
+
 # Set up logging
 logFormatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 logger.handlers = []
-logger.addHandler(logging.StreamHandler())
+logger.addHandler(logging.StreamHandler(sys.stdout))
 for handler in logger.handlers:
     handler.setFormatter(logFormatter)
 
@@ -93,6 +96,10 @@ def decode_filename(f):
         f = f.decode(sys.getfilesystemencoding())
     return f
 
+def fullpath(f):
+    """os.path.realpath + expanduser"""
+    return os.path.realpath(os.path.expanduser(f))
+
 def Property(function):
     keys = 'fget', 'fset', 'fdel'
     func_locals = {'doc':function.__doc__}
@@ -106,20 +113,44 @@ def Property(function):
     function()
     return property(**func_locals)
 
+def get_multi(d, keys, default=None):
+    '''Like "dict.get", but keys is a list of keys to try.
+
+    The value for the first key present will be returned, or default
+    if none of the keys are present.
+
+    '''
+    for k in keys:
+        try:
+            return d[k]
+        except KeyError:
+            pass
+    return default
+
+# Tag names copied from Quod Libet
+def get_album(mf):
+    return get_multi(mf, ("albumsort", "album"), [None])[0]
+def get_albumartist(mf):
+    return get_multi(mf, ("albumartistsort", "albumartist", "artistsort", "artist"), [None])[0]
+def get_albumid(mf):
+    return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [None])[0]
+def get_discnumber(mf):
+    return mf.get("discnumber", [None])[0]
+
+def album_key(mf):
+    return (os.path.dirname(mf.filename), type(mf),
+            get_album(mf), get_albumartist(mf),
+            get_albumid(mf), get_discnumber(mf))
+
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
     for replaygain information.'''
 
-    _track_set_key_functions = (lambda x: x.album_key,
-                                lambda x: os.path.dirname(decode_filename(x['~filename'])),
-                                lambda x: type(x),)
-
     def __init__(self, track):
         self.track = track
-        self.track_set_key = tuple(f(self.track) for f in self._track_set_key_functions)
 
     def __repr__(self):
-        return "RGTrack(%s)" % (repr(self.track), )
+        return "RGTrack(MusicFile({}))".format(repr(self.track.filename))
 
     def has_valid_rgdata(self):
         '''Returns True if the track has valid replay gain tags. The
@@ -129,9 +160,22 @@ class RGTrack(object):
     @Property
     def filename():
         def fget(self):
-            return decode_filename(self.track['~filename'])
-        def fset(self, value):
-            self.track['~filename'] = value
+            return self.track.filename
+
+    @Property
+    def directory():
+        def fget(self):
+            return os.path.dirname(self.filename)
+
+    @Property
+    def track_set_key():
+        def fget(self):
+            return (self.directory,
+                    type(self.track),
+                    get_album(self.track),
+                    get_albumartist(self.track),
+                    get_albumid(self.track),
+                    get_discnumber(self.track))
 
     @Property
     def track_set_key_string():
@@ -140,21 +184,16 @@ class RGTrack(object):
         Unlike the key itself, this is not guaranteed to uniquely
         identify a track set.'''
         def fget(self):
-            album = self.track("albumsort", "")
-            disc = self.track("discnumber", "")
-            (directory, filetype) = self.track_set_key[1:]
-
-            if album == '':
-                key_string = "No album"
-            else:
-                key_string = album
-            if disc == '':
-                pass
-            else:
-                key_string += " Disc " + disc
-            key_string += " in directory %s" % (directory,)
-            key_string += " of type %s" % (re.sub("File$","",filetype.__name__),)
-            return key_string
+            (dirname, ftype, album, artist, albumid, disc) = self.track_set_key
+            key_string = "{album}"
+            if disc:
+                key_string += " Disc {disc}"
+            if artist:
+                key_string += " by {artist}"
+            key_string += " in directory {dirname} of type {ftype}"
+            return key_string.format(
+                album=album or "[No album]",
+                disc=disc, artist=artist, dirname=dirname, ftype=ftype.__name__)
 
     @Property
     def gain():
@@ -191,10 +230,7 @@ class RGTrack(object):
     @Property
     def length_seconds():
         def fget(self):
-            return self.track['~#length']
-
-    def __len__(self):
-        return self.length_seconds
+            return self.track.info.length
 
     def save(self):
         #print 'Saving "%s" in %s' % (os.path.basename(self.filename), os.path.dirname(self.filename))
@@ -216,13 +252,13 @@ class RGTrackSet(object):
         self.RGTracks = dict((t.filename, t) for t in tracks)
         if len(self.RGTracks) < 1:
             raise ValueError("Need at least one track to analyze")
-        keys = set(t.track_set_key for t in self.RGTracks.values())
+        keys = set(t.track_set_key for t in self.RGTracks.itervalues())
         if (len(keys) != 1):
             raise ValueError("All tracks in an album must have the same key")
         self.gain_type = gain_type
 
     def __repr__(self):
-        return "RGTrackSet(%s, gain_type=%s)" % (repr(self.RGTracks.values()), repr(self.gain_type))
+        return "RGTrackSet(%s, gain_type=%s)" % (repr(self.RGTracks.itervalues()), repr(self.gain_type))
 
     @classmethod
     def MakeTrackSets(cls, tracks):
@@ -294,17 +330,17 @@ class RGTrackSet(object):
     @Property
     def track_set_key():
         def fget(self):
-            return next(self.RGTracks.itervalues()).track_set_key
+            return next(iter(self.RGTracks.itervalues())).track_set_key
 
     @Property
     def track_set_key_string():
         def fget(self):
-            return next(self.RGTracks.itervalues()).track_set_key_string
+            return next(iter(self.RGTracks.itervalues())).track_set_key_string
 
     @Property
     def directory():
         def fget(self):
-            return self.track_set_key[1]
+            return next(iter(self.RGTracks.itervalues())).directory
 
     def __len__(self):
         return self.length_seconds
@@ -370,7 +406,7 @@ class RGTrackSet(object):
         output = check_output(cmd)
         # Print the output all at once to minimize the chance of interleaving
         if verbose:
-            print output
+            print(output)
 
     def is_multitrack_album(self):
         '''Returns True if this track set represents at least two
@@ -403,43 +439,52 @@ class RGTrackSet(object):
             track.save()
 
 def remove_hidden_paths(paths):
-    '''Remove UNIX-style hidden paths from a list.'''
-    return [ p for p in paths if not re.search('^\.',p)]
+    '''Filter out UNIX-style hidden paths from an iterable.'''
+    return ( p for p in paths if not re.search('^\.',p) )
 
-def unique (items, key_fun = None):
-    '''Return an unique list of items, where two items are considered
-    non-unique if key_fun returns the same value for both of them.
+def unique(items, key = None):
+    '''Return an iterator over unique items, where two items are
+    considered non-unique if "key(item)" returns the same value for
+    both of them.
 
-    If no key_fun is provided, then the identity function is assumed,
-    in which case this is equivalent to list(set(items)).'''
-    if key_fun is None:
-        return(list(set(items)))
-    else:
-        return(dict((key_fun(i), i) for i in items).values())
+    If no key is provided, then the identity function is assumed by
+    default.
+
+    Note that this function caches the result of calling key() on
+    every item in order to check for duplicates, so its memory usage
+    is proportional to the length of the input.
+
+    '''
+    seen = set()
+    for x in items:
+        k = key(x) if key is not None else x
+        if k in seen:
+            pass
+        else:
+            yield x
+            seen.add(k)
 
 def get_all_music_files (paths, ignore_hidden=True):
     '''Recursively search in one or more paths for music files.
 
     By default, hidden files and directories are ignored.'''
-    music_files = []
     with stdout_redirected(os.devnull, sys.stderr):
         for p in paths:
+            p = fullpath(p)
             if os.path.isdir(p):
                 for root, dirs, files in os.walk(p, followlinks=True):
                     if ignore_hidden:
-                        files = remove_hidden_paths(files)
-                        dirs = remove_hidden_paths(dirs)
+                        files[:] = list(remove_hidden_paths(files))
+                        dirs[:] = list(remove_hidden_paths(dirs))
                     # Try to load every file as an audio file, and filter the
                     # ones that aren't actually audio files
-                    more_files = ( MusicFile(os.path.join(root, x)) for x in files )
-                    music_files.extend( f for f in more_files if f is not None )
+                    more_files = ( MusicFile(os.path.join(root, f)) for f in files )
+                    for item in ifilter(None, more_files):
+                        yield item
             else:
                 f = MusicFile(p)
                 if f is not None:
-                    music_files.append(f)
-
-    # Filter duplicate files and return
-    return(unique(music_files, key_fun=lambda x: x['~filename']))
+                    yield f
 
 class TrackSetHandler(object):
     """Pickleable stateful callable for multiprocessing.Pool.imap"""
@@ -478,7 +523,7 @@ def positive_int(x):
         "option", "g", str, ('album', 'track', 'auto'), '(track|album|auto)'),
     dry_run=("Don't modify any files. Only analyze and report gain.",
              "flag", "n"),
-    music_directories=(
+    music_dir=(
         "Directories in which to search for music files.",
         "positional"),
     jobs=(
@@ -497,7 +542,7 @@ def main(force_reanalyze=False, include_hidden=False,
          jobs=default_job_count(),
          replaygain_path="replaygain",
          quiet=False, verbose=False,
-         *music_directories
+         *music_dir
          ):
     """Add replaygain tags to your music files."""
     if quiet:
@@ -515,22 +560,23 @@ def main(force_reanalyze=False, include_hidden=False,
         os.kill(os.getpid(), signal.SIGTERM)
     original_handler = signal.signal(signal.SIGINT, signal_handler)
 
-    track_class = RGTrack
+    track_constructor = RGTrack
     if dry_run:
         logger.warn('This script is running in "dry run" mode, so no files will actually be modified.')
-        track_class = RGTrackDryRun
-    if len(music_directories) == 0:
+        track_constructor = RGTrackDryRun
+    if len(music_dir) == 0:
         logger.error("You did not specify any music directories or files. Exiting.")
         sys.exit(1)
 
-    music_directories = map(realpath, music_directories)
+    music_directories = list(unique(map(fullpath, music_dir)))
     logger.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
-    tracks = [ track_class(f) for f in get_all_music_files(music_directories, ignore_hidden=(not include_hidden)) ]
+    all_music_files = tqdm(unique(get_all_music_files(music_directories, ignore_hidden=(not include_hidden))))
+    tracks = [ track_constructor(f) for f in all_music_files ]
 
     # Filter out tracks for which we can't get the length
     for t in tracks[:]:
         try:
-            len(t)
+            t.length_seconds
         except Exception:
             logger.error("Track %s appears to be invalid. Skipping.", t.filename)
             tracks.remove(t)
@@ -547,28 +593,17 @@ def main(force_reanalyze=False, include_hidden=False,
 
     handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run, verbose=verbose)
 
-    # For display purposes, calculate how much granularity is required
-    # to show visible progress at each update
-    total_length = sum(len(ts) for ts in track_sets)
-    min_step = min(len(ts) for ts in track_sets)
-    places_past_decimal = max(0,int(math.ceil(-math.log10(min_step * 100.0 / total_length))))
-    update_string = '%.' + str(places_past_decimal) + 'f%% done'
-
     pool = None
     try:
         if jobs == 1:
             # Sequential
-            handled_track_sets = imap(handler, track_sets)
+            handled_track_sets = imap(handler, tqdm(track_sets))
         else:
             # Parallel
             pool = Pool(jobs)
-            handled_track_sets = pool.imap_unordered(handler,track_sets)
-        processed_length = 0
-        percent_done = 0
-        for ts in handled_track_sets:
-            processed_length = processed_length + len(ts)
-            percent_done = 100.0 * processed_length / total_length
-            logger.info(update_string, percent_done)
+            handled_track_sets = pool.imap_unordered(handler, tqdm(track_sets))
+        # Wait for completion
+        list(handled_track_sets)
         logger.info("Analysis complete.")
     except KeyboardInterrupt:
         if pool is not None:
