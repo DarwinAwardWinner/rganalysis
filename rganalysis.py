@@ -25,7 +25,7 @@ import traceback
 
 from contextlib import contextmanager
 from itertools import imap, ifilter
-from multiprocessing.pool import Pool
+from multiprocessing.pool import ThreadPool
 from mutagen import File as MusicFile
 from mutagen.aac import AACError
 from mutagen.easyid3 import EasyID3
@@ -188,7 +188,8 @@ class RGTrack(object):
             key_string += " in directory {dirname} of type {ftype}"
             return key_string.format(
                 album=album or "[No album]",
-                disc=disc, artist=artist, dirname=dirname, ftype=ftype.__name__)
+                disc=disc, artist=artist, dirname=dirname,
+                ftype=ftype.__name__.replace("Easy", ""))
 
     @Property
     def gain():
@@ -562,7 +563,8 @@ def main(force_reanalyze=False, include_hidden=False,
 
     music_directories = list(unique(map(fullpath, music_dir)))
     logger.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
-    all_music_files = tqdm(unique(get_all_music_files(music_directories, ignore_hidden=(not include_hidden))))
+    all_music_files = tqdm(unique(get_all_music_files(music_directories, ignore_hidden=(not include_hidden))),
+                           desc="Finding files")
     tracks = [ track_constructor(f) for f in all_music_files ]
 
     # Filter out tracks for which we can't get the length
@@ -586,17 +588,16 @@ def main(force_reanalyze=False, include_hidden=False,
     handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run, verbose=verbose)
 
     pool = None
-    jobs = 1
     try:
         if jobs == 1:
             # Sequential
-            handled_track_sets = imap(handler, tqdm(track_sets))
+            handled_track_sets = imap(handler, track_sets)
         else:
             # Parallel
-            pool = Pool(jobs)
-            handled_track_sets = pool.imap_unordered(handler, tqdm(track_sets))
+            pool = ThreadPool(jobs)
+            handled_track_sets = pool.imap_unordered(handler, track_sets)
         # Wait for completion
-        list(handled_track_sets)
+        list(tqdm(handled_track_sets, total=len(track_sets), desc="Analyzing"))
         logger.info("Analysis complete.")
     except KeyboardInterrupt:
         if pool is not None:
