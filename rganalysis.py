@@ -137,11 +137,6 @@ def get_albumid(mf):
 def get_discnumber(mf):
     return mf.get("discnumber", [None])[0]
 
-def album_key(mf):
-    return (os.path.dirname(mf.filename), type(mf),
-            get_album(mf), get_albumartist(mf),
-            get_albumid(mf), get_discnumber(mf))
-
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
     for replaygain information.'''
@@ -150,7 +145,7 @@ class RGTrack(object):
         self.track = track
 
     def __repr__(self):
-        return "RGTrack(MusicFile({}))".format(repr(self.track.filename))
+        return "RGTrack(MusicFile({}, easy=True))".format(repr(self.track.filename))
 
     def has_valid_rgdata(self):
         '''Returns True if the track has valid replay gain tags. The
@@ -342,9 +337,6 @@ class RGTrackSet(object):
         def fget(self):
             return next(iter(self.RGTracks.itervalues())).directory
 
-    def __len__(self):
-        return self.length_seconds
-
     def _get_tag(self, tag):
         '''Get the value of a tag, only if all tracks in the album
         have the same value for that tag. If the tracks disagree on
@@ -478,11 +470,11 @@ def get_all_music_files (paths, ignore_hidden=True):
                         dirs[:] = list(remove_hidden_paths(dirs))
                     # Try to load every file as an audio file, and filter the
                     # ones that aren't actually audio files
-                    more_files = ( MusicFile(os.path.join(root, f)) for f in files )
+                    more_files = ( MusicFile(os.path.join(root, f), easy=True) for f in files )
                     for item in ifilter(None, more_files):
                         yield item
             else:
-                f = MusicFile(p)
+                f = MusicFile(p, easy=True)
                 if f is not None:
                     yield f
 
