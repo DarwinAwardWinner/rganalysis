@@ -27,9 +27,6 @@ from contextlib import contextmanager
 from itertools import imap, ifilter
 from multiprocessing.pool import ThreadPool
 from mutagen import File as MusicFile
-from mutagen.aac import AACError
-from mutagen.easyid3 import EasyID3
-from mutagen.easymp4 import EasyMP4Tags
 from subprocess import check_output
 
 try:
@@ -44,7 +41,7 @@ logFormatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.handlers = []
-logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.addHandler(logging.StreamHandler())
 for handler in logger.handlers:
     handler.setFormatter(logFormatter)
 
@@ -129,13 +126,13 @@ def get_multi(d, keys, default=None):
 
 # Tag names copied from Quod Libet
 def get_album(mf):
-    return get_multi(mf, ("albumsort", "album"), [None])[0]
+    return get_multi(mf, ("albumsort", "album"), [''])[0].encode("utf8")
 def get_albumartist(mf):
-    return get_multi(mf, ("albumartistsort", "albumartist", "artistsort", "artist"), [None])[0]
+    return get_multi(mf, ("albumartistsort", "albumartist", "artistsort", "artist"), [''])[0].encode("utf8")
 def get_albumid(mf):
-    return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [None])[0]
+    return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [''])[0].encode("utf8")
 def get_discnumber(mf):
-    return mf.get("discnumber", [None])[0]
+    return mf.get("discnumber", [''])[0].encode("utf8")
 
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
@@ -145,7 +142,7 @@ class RGTrack(object):
         self.track = track
 
     def __repr__(self):
-        return "RGTrack(MusicFile({}, easy=True))".format(repr(self.track.filename))
+        return "RGTrack(MusicFile({}, easy=True))".format(repr(self.filename))
 
     def has_valid_rgdata(self):
         '''Returns True if the track has valid replay gain tags. The
@@ -155,7 +152,7 @@ class RGTrack(object):
     @Property
     def filename():
         def fget(self):
-            return self.track.filename
+            return decode_filename(self.track.filename)
 
     @Property
     def directory():
@@ -563,8 +560,8 @@ def main(force_reanalyze=False, include_hidden=False,
 
     music_directories = list(unique(map(fullpath, music_dir)))
     logger.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
-    all_music_files = tqdm(unique(get_all_music_files(music_directories, ignore_hidden=(not include_hidden))),
-                           desc="Finding files")
+    all_music_files = unique(get_all_music_files(music_directories,
+                                                 ignore_hidden=(not include_hidden)))
     tracks = [ track_constructor(f) for f in all_music_files ]
 
     # Filter out tracks for which we can't get the length
