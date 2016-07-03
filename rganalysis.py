@@ -51,8 +51,16 @@ def fileno(file_or_fd):
         raise ValueError("Expected a file (`.fileno()`) or a file descriptor")
     return fd
 
+# http://stackoverflow.com/a/22434262/125921
 @contextmanager
 def stdout_redirected(to=os.devnull, stdout=None):
+    """Redirect stdout to another file.
+
+    This function performs redirection at the filehandle level, so
+    even direct filehandle manipulation and the stdout of subprocesses
+    are redirected to the specified filehandle.
+
+    """
     if stdout is None:
        stdout = sys.stdout
 
