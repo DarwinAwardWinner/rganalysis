@@ -36,6 +36,14 @@ from subprocess import check_output
 
 # http://stackoverflow.com/a/22434262/125921
 from contextlib import contextmanager
+# Set up logging
+logFormatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.handlers = []
+logger.addHandler(logging.StreamHandler())
+for handler in logger.handlers:
+    handler.setFormatter(logFormatter)
 
 def fileno(file_or_fd):
     fd = getattr(file_or_fd, 'fileno', lambda: file_or_fd)()
@@ -150,7 +158,7 @@ class RGTrack(object):
             except KeyError:
                 return None
         def fset(self, value):
-            logging.debug("Setting %s to %s for %s" % (tag, value, self.filename))
+            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             self.track[tag] = str(value)
         def fdel(self):
             if self.track.has_key(tag):
@@ -166,7 +174,7 @@ class RGTrack(object):
             except KeyError:
                 return None
         def fset(self, value):
-            logging.debug("Setting %s to %s for %s" % (tag, value, self.filename))
+            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             self.track[tag] = str(value)
         def fdel(self):
             if self.track.has_key(tag):
@@ -314,13 +322,13 @@ class RGTrackSet(object):
 
     def _set_tag(self, tag, value):
         '''Set tag to value in all tracks in the album.'''
-        logging.debug("Setting %s to %s in all tracks in %s.", tag, value, self.track_set_key_string)
+        logger.debug("Setting %s to %s in all tracks in %s.", tag, value, self.track_set_key_string)
         for t in self.RGTracks.itervalues():
             t.track[tag] = str(value)
 
     def _del_tag(self, tag):
         '''Delete tag from all tracks in the album.'''
-        logging.debug("Deleting %s in all tracks in %s.", tag, self.track_set_key_string)
+        logger.debug("Deleting %s in all tracks in %s.", tag, self.track_set_key_string)
         for t in self.RGTracks.itervalues():
             try:
                 del t.track[tag]
@@ -341,7 +349,7 @@ class RGTrackSet(object):
             self.gain_type = gain_type
 
         # Only want album gain for real albums, not single tracks
-        logging.info('Analyzing track set "%s"', self.track_set_key_string)
+        logger.info('Analyzing track set "%s"', self.track_set_key_string)
         cmd = [replaygain_path]
         if force:
             cmd.append("--force")
@@ -350,7 +358,7 @@ class RGTrackSet(object):
         if not self.want_album_gain():
             cmd.append("--no-album")
         cmd.extend(self.filenames)
-        logging.debug("Executing command: %s", repr(cmd))
+        logger.debug("Executing command: %s", repr(cmd))
         output = check_output(cmd)
         # Print the output all at once to minimize the chance of interleaving
         if verbose:
@@ -373,11 +381,11 @@ class RGTrackSet(object):
         """Report calculated replay gain tags."""
         for k in sorted(self.filenames):
             track = self.RGTracks[k]
-            logging.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain, track.peak)
+            logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain, track.peak)
         if self.want_album_gain():
-            logging.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string, self.gain, self.peak)
+            logger.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string, self.gain, self.peak)
         else:
-            logging.info("Did not set album gain tags for %s.", self.track_set_key_string)
+            logger.info("Did not set album gain tags for %s.", self.track_set_key_string)
 
     def save(self):
         """Save the calculated replaygain tags"""
@@ -439,7 +447,7 @@ class TrackSetHandler(object):
                 force=self.force, gain_type=self.gain_type, dry_run=self.dry_run,
                 verbose=False, replaygain_path=self.replaygain_path)
         except Exception:
-            logging.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
+            logger.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
         return track_set
 
 def positive_int(x):
@@ -472,30 +480,30 @@ def main(force_reanalyze=False, include_hidden=False,
          ):
     """Add replaygain tags to your music files."""
     if quiet:
-        logging.basicConfig(level=logging.WARN)
+        logger.setLevel(logging.WARN)
     elif verbose:
-        logging.basicConfig(level=logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
     else:
-        logging.basicConfig(level=logging.INFO)
+        logger.setLevel(logging.INFO)
 
     # Some pesky functions used below will catch KeyboardInterrupts
     # inappropriately, so install an alternate handler that bypasses
     # KeyboardInterrupt instead.
     def signal_handler(sig, frame):
-        logging.error("Canceled.")
+        logger.error("Canceled.")
         os.kill(os.getpid(), signal.SIGTERM)
     original_handler = signal.signal(signal.SIGINT, signal_handler)
 
     track_class = RGTrack
     if dry_run:
-        logging.warn('This script is running in "dry run" mode, so no files will actually be modified.')
+        logger.warn('This script is running in "dry run" mode, so no files will actually be modified.')
         track_class = RGTrackDryRun
     if len(music_directories) == 0:
-        logging.error("You did not specify any music directories or files. Exiting.")
+        logger.error("You did not specify any music directories or files. Exiting.")
         sys.exit(1)
 
     music_directories = map(realpath, music_directories)
-    logging.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
+    logger.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
     tracks = [ track_class(f) for f in get_all_music_files(music_directories, ignore_hidden=(not include_hidden)) ]
 
     # Filter out tracks for which we can't get the length
@@ -503,18 +511,18 @@ def main(force_reanalyze=False, include_hidden=False,
         try:
             len(t)
         except Exception:
-            logging.error("Track %s appears to be invalid. Skipping.", t.filename)
+            logger.error("Track %s appears to be invalid. Skipping.", t.filename)
             tracks.remove(t)
 
     if len(tracks) == 0:
-        logging.error("Failed to find any tracks in the directories you specified. Exiting.")
+        logger.error("Failed to find any tracks in the directories you specified. Exiting.")
         sys.exit(1)
     track_sets = RGTrackSet.MakeTrackSets(tracks)
 
     # Remove the earlier bypass of KeyboardInterrupt
     signal.signal(signal.SIGINT, original_handler)
 
-    logging.info("Beginning analysis")
+    logger.info("Beginning analysis")
 
     handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run, verbose=verbose)
 
@@ -539,20 +547,20 @@ def main(force_reanalyze=False, include_hidden=False,
         for ts in handled_track_sets:
             processed_length = processed_length + len(ts)
             percent_done = 100.0 * processed_length / total_length
-            logging.info(update_string, percent_done)
-        logging.info("Analysis complete.")
+            logger.info(update_string, percent_done)
+        logger.info("Analysis complete.")
     except KeyboardInterrupt:
         if pool is not None:
-            logging.debug("Terminating process pool")
+            logger.debug("Terminating process pool")
             pool.terminate()
             pool = None
         raise
     finally:
         if pool is not None:
-            logging.debug("Closing transcode process pool")
+            logger.debug("Closing transcode process pool")
             pool.close()
     if dry_run:
-        logging.warn('This script ran in "dry run" mode, so no files were actually modified.')
+        logger.warn('This script ran in "dry run" mode, so no files were actually modified.')
     pass
 
 # Entry point
@@ -560,7 +568,7 @@ def plac_call_main():
     try:
         return plac.call(main)
     except KeyboardInterrupt:
-        logging.error("Canceled.")
+        logger.error("Canceled.")
         sys.exit(1)
 
 if __name__=="__main__":
