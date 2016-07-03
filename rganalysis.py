@@ -594,6 +594,7 @@ def main(force_reanalyze=False, include_hidden=False,
     handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run, verbose=verbose)
 
     pool = None
+    jobs = 1
     try:
         if jobs == 1:
             # Sequential
