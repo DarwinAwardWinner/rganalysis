@@ -2,6 +2,13 @@
 
 cd $(dirname $0)
 
+./rganalysis.py --help &>/dev/null || {
+    echo "Cannot run rganalysis.py:"
+    # Run it again to print the error message
+    ./rganalysis.py --help
+    exit 1
+}
+
 {
   # Before
   perl -lape 'do { print; exit; } if /<pre><code>/' README.mkdn

@@ -5,26 +5,25 @@ help text (`rganalysis.py --help`) contains (almost) all you need to
 know:
 
 <pre><code>
-usage: rganalysis.py [-h] [-f] [-i] [-n] [-g auto] [-j 2] [-q] [-v]
-                     [music_directories [music_directories ...]]
+usage: rganalysis.py [-h] [-f] [-i] [-n] [-g (track|album|auto)] [-j 4]
+                     [-r PATH_TO_REPLAYGAIN] [-q] [-v]
+                     [music_dir [music_dir ...]]
 
 Add replaygain tags to your music files.
 
 positional arguments:
-  music_directories     Directories in which to search for music files.
+  music_dir             Directories in which to search for music files.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f, --force-reanalyze, --force_reanalyze
+  -f, --force-reanalyze
                         Reanalyze all files and recalculate replaygain values,
                         even if the files already have valid replaygain tags.
-                        Normally, only files without replaygain tags will be
-                        analyzed.
-  -i, --include-hidden, --include_hidden
-                        Do not skip hidden files and directories.
-  -n, --dry-run, --dry_run
-                        Don't modify any files. Only analyze and report gain.
-  -g auto, --gain-type auto, --gain_type auto
+                        Normally, only files missing or inconsistent
+                        replaygain tags will be analyzed.
+  -i, --include-hidden  Do not skip hidden files and directories.
+  -n, --dry-run         Don't modify any files. Only analyze and report gain.
+  -g (track|album|auto), --gain-type (track|album|auto)
                         Can be "album", "track", or "auto". If "track", only
                         track gain values will be calculated, and album gain
                         values will be erased. if "album", both track and
@@ -33,18 +32,30 @@ optional arguments:
                         contain a file called "TRACKGAIN" or ".TRACKGAIN". In
                         these directories, "track" mode will be used. The
                         default setting is "auto".
-  -j 2, --jobs 2        Number of albums to analyze in parallel. The default
+  -j 4, --jobs 4        Number of albums to analyze in parallel. The default
                         is the number of cores detected on your system.
+  -r PATH_TO_REPLAYGAIN, --replaygain-path PATH_TO_REPLAYGAIN
+                        Path to replaygain program. Only required if it is not
+                        in your $PATH.
   -q, --quiet           Do not print informational messages.
   -v, --verbose         Print debug messages that are probably only useful if
                         something is going wrong.
 </pre></code>
 
-Note that you need the 'rgain' python module installed, with the
-accompanying `replaygain` script in your `$PATH`. (This script doesn't
-currently import the rgain module despite both being python, since it
-was easier to implement by having it call the script instead. Patches
-fixing this are welcome.)
+Note that in addition to the python modules used directly by this
+script, you also need the 'rgain' python module installed, with the
+accompanying `replaygain` script in your `$PATH`. Note that rgain only
+works with Python 2 and also requires the installation of
+[Pycairo](https://cairographics.org/pycairo/),
+[PyGObject](https://wiki.gnome.org/action/show/Projects/PyGObject?action=show&redirect=PyGObject),
+and
+[Gst-Python](https://gstreamer.freedesktop.org/modules/gst-python.html),
+all of which cannot be installed via `pip`, along with all their
+non-python dependencies (Gstreamer, etc.). In Debian/Ubuntu, you can
+just install the "python-rgain" package, which should install all the
+dependencies for you. Since this script is only calling `replaygain`
+as an external script, they need not be installed in the same copy of
+python.
 
 ## What is an album?
 

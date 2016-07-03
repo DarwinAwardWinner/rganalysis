@@ -459,18 +459,31 @@ def positive_int(x):
 
 @plac.annotations(
     # arg=(helptext, kind, abbrev, type, choices, metavar)
-    force_reanalyze=('Reanalyze all files and recalculate replaygain values, even if the files already have valid replaygain tags. Normally, only files missing or inconsistent replaygain tags will be analyzed.', "flag", "f"),
-    include_hidden=('Do not skip hidden files and directories.', "flag", "i"),
-    gain_type=('Can be "album", "track", or "auto". If "track", only track gain values will be calculated, and album gain values will be erased. if "album", both track and album gain values will be calculated. If "auto", then "album" mode will be used except in directories that contain a file called "TRACKGAIN" or ".TRACKGAIN". In these directories, "track" mode will be used. The default setting is "auto".',
-        "option", "g", str, ('album', 'track', 'auto')),
+    force_reanalyze=(
+        'Reanalyze all files and recalculate replaygain values, even if the files already have valid replaygain tags. Normally, only files missing or inconsistent replaygain tags will be analyzed.',
+        "flag", "f"),
+    include_hidden=(
+        'Do not skip hidden files and directories.',
+        "flag", "i"),
+    gain_type=(
+        'Can be "album", "track", or "auto". If "track", only track gain values will be calculated, and album gain values will be erased. if "album", both track and album gain values will be calculated. If "auto", then "album" mode will be used except in directories that contain a file called "TRACKGAIN" or ".TRACKGAIN". In these directories, "track" mode will be used. The default setting is "auto".',
+        "option", "g", str, ('album', 'track', 'auto'), '(track|album|auto)'),
     dry_run=("Don't modify any files. Only analyze and report gain.",
-        "flag", "n"),
-    music_directories=("Directories in which to search for music files.", "positional"),
-    jobs=("Number of albums to analyze in parallel. The default is the number of cores detected on your system.", "option", "j", positive_int),
-    replaygain_path=("Path to replaygain program", "option", "r", str),
-    quiet=("Do not print informational messages.", "flag", "q"),
-    verbose=("Print debug messages that are probably only useful if something is going wrong.", "flag", "v"),
-    )
+             "flag", "n"),
+    music_directories=(
+        "Directories in which to search for music files.",
+        "positional"),
+    jobs=(
+        "Number of albums to analyze in parallel. The default is the number of cores detected on your system.",
+        "option", "j", positive_int),
+    replaygain_path=(
+        "Path to replaygain program. Only required if it is not in your $PATH.", "option", "r", str, None, "PATH_TO_REPLAYGAIN"),
+    quiet=(
+        "Do not print informational messages.", "flag", "q"),
+    verbose=(
+        "Print debug messages that are probably only useful if something is going wrong.",
+        "flag", "v"),
+)
 def main(force_reanalyze=False, include_hidden=False,
          dry_run=False, gain_type='auto',
          jobs=default_job_count(),
