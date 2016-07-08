@@ -185,7 +185,8 @@ class RGTrack(object):
             key_string += " in directory {dirname} of type {ftype}"
             return key_string.format(
                 album=album or "[No album]",
-                disc=disc, artist=artist, dirname=dirname,
+                disc=disc, artist=artist,
+                dirname=dirname.encode(sys.getfilesystemencoding()),
                 ftype=ftype.__name__.replace("Easy", ""))
 
     @Property
