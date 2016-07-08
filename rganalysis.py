@@ -45,6 +45,25 @@ logger.addHandler(logging.StreamHandler())
 for handler in logger.handlers:
     handler.setFormatter(logFormatter)
 
+import __builtin__
+openfiles = set()
+oldfile = __builtin__.file
+class newfile(oldfile):
+    def __init__(self, *args):
+        self.x = args[0]
+        logger.debug("OPENING %s" % repr(str(self.x)))
+        oldfile.__init__(self, *args)
+        openfiles.add(self)
+    def close(self):
+        logger.debug("CLOSING %s" % repr(str(self.x)))
+        oldfile.close(self)
+        openfiles.remove(self)
+oldopen = __builtin__.open
+def newopen(*args):
+    return newfile(*args)
+__builtin__.file = newfile
+__builtin__.open = newopen
+
 def fileno(file_or_fd):
     fd = getattr(file_or_fd, 'fileno', lambda: file_or_fd)()
     if not isinstance(fd, int):
@@ -459,23 +478,25 @@ def get_all_music_files (paths, ignore_hidden=True):
     '''Recursively search in one or more paths for music files.
 
     By default, hidden files and directories are ignored.'''
-    with stdout_redirected(os.devnull, sys.stderr):
-        for p in paths:
-            p = fullpath(p)
-            if os.path.isdir(p):
-                for root, dirs, files in os.walk(p, followlinks=True):
-                    if ignore_hidden:
-                        files[:] = list(remove_hidden_paths(files))
-                        dirs[:] = list(remove_hidden_paths(dirs))
-                    # Try to load every file as an audio file, and filter the
-                    # ones that aren't actually audio files
-                    more_files = ( MusicFile(os.path.join(root, f), easy=True) for f in files )
-                    for item in ifilter(None, more_files):
-                        yield item
-            else:
-                f = MusicFile(p, easy=True)
-                if f is not None:
-                    yield f
+    for p in paths:
+        p = fullpath(p)
+        if os.path.isdir(p):
+            for root, dirs, files in os.walk(p, followlinks=True):
+                logger.debug("Searching for music files in %s", repr(root))
+                if ignore_hidden:
+                    files[:] = list(remove_hidden_paths(files))
+                    dirs[:] = list(remove_hidden_paths(dirs))
+                # Try to load every file as an audio file, and filter the
+                # ones that aren't actually audio files
+                more_files = ( MusicFile(os.path.join(root, f), easy=True) for f in files )
+                for item in ifilter(None, more_files):
+                    logger.debug("Found %s", repr(item.filename))
+                    yield item
+        else:
+            logger.debug("Checking for music file at %s", repr(p))
+            f = MusicFile(p, easy=True)
+            if f is not None:
+                yield f
 
 class PickleableMethodCaller(object):
     """Pickleable method caller for multiprocessing.Pool.imap"""
