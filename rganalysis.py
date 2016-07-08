@@ -477,19 +477,30 @@ def get_all_music_files (paths, ignore_hidden=True):
                 if f is not None:
                     yield f
 
-class TrackSetHandler(object):
-    """Pickleable stateful callable for multiprocessing.Pool.imap"""
+class PickleableMethodCaller(object):
+    """Pickleable method caller for multiprocessing.Pool.imap"""
+    def __init__(self, method_name, *args, **kwargs):
+        self.method_name = method_name
+        self.args = args
+        self.kwargs = kwargs
+    def __call__(self, obj):
+        return getattr(obj, self.method_name)(*self.args, **self.kwargs)
+
+class TrackSetHandler(PickleableMethodCaller):
+    """Pickleable callable for multiprocessing.Pool.imap"""
     def __init__(self, force=False, gain_type="auto", dry_run=False, verbose=False,
                  replaygain_path="replaygain"):
-        self.force = force
-        self.gain_type = gain_type
-        self.dry_run = dry_run
-        self.replaygain_path = replaygain_path
+        super(TrackSetHandler, self).__init__(
+            "do_gain",
+            force = force,
+            gain_type = gain_type,
+            verbose = verbose,
+            dry_run = dry_run,
+            replaygain_path = replaygain_path,
+        )
     def __call__(self, track_set):
         try:
-            track_set.do_gain(
-                force=self.force, gain_type=self.gain_type, dry_run=self.dry_run,
-                verbose=False, replaygain_path=self.replaygain_path)
+            super(TrackSetHandler, self).__call__(track_set)
         except Exception:
             logger.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
         return track_set
