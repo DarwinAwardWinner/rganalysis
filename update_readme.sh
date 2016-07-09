@@ -2,10 +2,11 @@
 
 cd $(dirname $0)
 
-./rganalysis.py --help &>/dev/null || {
+SCRIPT=./scripts/rganalysis
+$SCRIPT --help &>/dev/null || {
     echo "Cannot run rganalysis.py:"
     # Run it again to print the error message
-    ./rganalysis.py --help
+    $SCRIPT --help
     exit 1
 }
 
@@ -13,7 +14,7 @@ cd $(dirname $0)
   # Before
   perl -lape 'do { print; exit; } if /<pre><code>/' README.mkdn
   # Help text
-  ./rganalysis.py --help 2>&1
+  $SCRIPT --help 2>&1
   # After
   perl -lane 'print if $found ||= m{</pre></code>}' README.mkdn
 } > new_readme.txt
