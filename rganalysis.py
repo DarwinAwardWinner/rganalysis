@@ -12,6 +12,7 @@
 
 from __future__ import print_function
 
+import audiotools
 import logging
 import math
 import multiprocessing
@@ -23,18 +24,20 @@ import signal
 import sys
 import traceback
 
+from audiotools import UnsupportedFile
 from contextlib import contextmanager
-from itertools import imap, ifilter
+from multiprocessing import Process
 from multiprocessing.pool import ThreadPool
 from mutagen import File as MusicFile
 from subprocess import check_output
 
+def tqdm_fake(iterable, *args, **kwargs):
+    return iterable
 try:
-    from tqdm import tqdm
+    from tqdm import tqdm as tqdm_real
 except ImportError:
     # Fallback: No progress bars
-    def tqdm(iterable, *args, **kwargs):
-        return iterable
+    tqdm_real = tqdm_fake
 
 # Set up logging
 logFormatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
@@ -88,11 +91,6 @@ def default_job_count():
     except Exception:
         return 1
 
-def decode_filename(f):
-    if isinstance(f, str):
-        f = f.decode(sys.getfilesystemencoding())
-    return f
-
 def fullpath(f):
     """os.path.realpath + expanduser"""
     return os.path.realpath(os.path.expanduser(f))
@@ -126,13 +124,16 @@ def get_multi(d, keys, default=None):
 
 # Tag names copied from Quod Libet
 def get_album(mf):
-    return get_multi(mf, ("albumsort", "album"), [''])[0].encode("utf8")
+    return get_multi(mf, ("albumsort", "album"), [''])[0]
 def get_albumartist(mf):
-    return get_multi(mf, ("albumartistsort", "albumartist", "artistsort", "artist"), [''])[0].encode("utf8")
+    return get_multi(mf, ("albumartistsort", "albumartist", "artistsort", "artist"), [''])[0]
 def get_albumid(mf):
-    return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [''])[0].encode("utf8")
+    return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [''])[0]
 def get_discnumber(mf):
-    return mf.get("discnumber", [''])[0].encode("utf8")
+    return mf.get("discnumber", [''])[0]
+def get_full_classname(mf):
+    t = type(mf)
+    return "{}.{}".format(t.__module__, t.__qualname__)
 
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
@@ -152,7 +153,7 @@ class RGTrack(object):
     @Property
     def filename():
         def fget(self):
-            return decode_filename(self.track.filename)
+            return self.track.filename
 
     @Property
     def directory():
@@ -163,7 +164,7 @@ class RGTrack(object):
     def track_set_key():
         def fget(self):
             return (self.directory,
-                    type(self.track),
+                    get_full_classname(self.track),
                     get_album(self.track),
                     get_albumartist(self.track),
                     get_albumid(self.track),
@@ -176,7 +177,8 @@ class RGTrack(object):
         Unlike the key itself, this is not guaranteed to uniquely
         identify a track set.'''
         def fget(self):
-            (dirname, ftype, album, artist, albumid, disc) = self.track_set_key
+            (dirname, classname, album, artist, albumid, disc) = self.track_set_key
+            classname = re.sub("^.*\\.(Easy)?", "", classname)
             key_string = "{album}"
             if disc:
                 key_string += " Disc {disc}"
@@ -186,8 +188,8 @@ class RGTrack(object):
             return key_string.format(
                 album=album or "[No album]",
                 disc=disc, artist=artist,
-                dirname=dirname.encode(sys.getfilesystemencoding()),
-                ftype=ftype.__name__.replace("Easy", ""))
+                dirname=dirname,
+                ftype=classname)
 
     @Property
     def gain():
@@ -228,7 +230,7 @@ class RGTrack(object):
 
     def save(self):
         #print 'Saving "%s" in %s' % (os.path.basename(self.filename), os.path.dirname(self.filename))
-        self.track.write()
+        self.track.save()
 
 class RGTrackDryRun(RGTrack):
     """Same as RGTrack, but the save() method does nothing.
@@ -243,16 +245,16 @@ class RGTrackSet(object):
     track_gain_signal_filenames = ('TRACKGAIN', '.TRACKGAIN', '_TRACKGAIN')
 
     def __init__(self, tracks, gain_type="auto"):
-        self.RGTracks = dict((t.filename, t) for t in tracks)
+        self.RGTracks = { str(t.filename): t for t in tracks }
         if len(self.RGTracks) < 1:
             raise ValueError("Need at least one track to analyze")
-        keys = set(t.track_set_key for t in self.RGTracks.itervalues())
+        keys = set(t.track_set_key for t in self.RGTracks.values())
         if (len(keys) != 1):
             raise ValueError("All tracks in an album must have the same key")
         self.gain_type = gain_type
 
     def __repr__(self):
-        return "RGTrackSet(%s, gain_type=%s)" % (repr(self.RGTracks.itervalues()), repr(self.gain_type))
+        return "RGTrackSet(%s, gain_type=%s)" % (repr(self.RGTracks.values()), repr(self.gain_type))
 
     @classmethod
     def MakeTrackSets(cls, tracks):
@@ -319,22 +321,22 @@ class RGTrackSet(object):
     @Property
     def length_seconds():
         def fget(self):
-            return sum(t.length_seconds for t in self.RGTracks.itervalues())
+            return sum(t.length_seconds for t in self.RGTracks.values())
 
     @Property
     def track_set_key():
         def fget(self):
-            return next(iter(self.RGTracks.itervalues())).track_set_key
+            return next(iter(self.RGTracks.values())).track_set_key
 
     @Property
     def track_set_key_string():
         def fget(self):
-            return next(iter(self.RGTracks.itervalues())).track_set_key_string
+            return next(iter(self.RGTracks.values())).track_set_key_string
 
     @Property
     def directory():
         def fget(self):
-            return next(iter(self.RGTracks.itervalues())).directory
+            return next(iter(self.RGTracks.values())).directory
 
     def _get_tag(self, tag):
         '''Get the value of a tag, only if all tracks in the album
@@ -345,7 +347,7 @@ class RGTrackSet(object):
         In particular, note that None and False have different
         meanings.'''
         try:
-            tags = set(t.track[tag] for t in self.RGTracks.itervalues())
+            tags = set(tuple(t.track[tag]) for t in self.RGTracks.values())
             if len(tags) == 1:
                 return tags.pop()
             elif len(tags) > 1:
@@ -358,18 +360,18 @@ class RGTrackSet(object):
     def _set_tag(self, tag, value):
         '''Set tag to value in all tracks in the album.'''
         logger.debug("Setting %s to %s in all tracks in %s.", tag, value, self.track_set_key_string)
-        for t in self.RGTracks.itervalues():
+        for t in self.RGTracks.values():
             t.track[tag] = str(value)
 
     def _del_tag(self, tag):
         '''Delete tag from all tracks in the album.'''
         logger.debug("Deleting %s in all tracks in %s.", tag, self.track_set_key_string)
-        for t in self.RGTracks.itervalues():
+        for t in self.RGTracks.values():
             try:
                 del t.track[tag]
             except KeyError: pass
 
-    def do_gain(self, force=False, gain_type=None, dry_run=False, verbose=False, replaygain_path="replaygain"):
+    def do_gain(self, force=False, gain_type=None, dry_run=False, verbose=False):
         """Analyze all tracks in the album, and add replay gain tags
         to the tracks based on the analysis.
 
@@ -380,24 +382,30 @@ class RGTrackSet(object):
         described in the help. If provided to this method, it will sef
         the object's gain_type field.
         """
-        if gain_type:
-            self.gain_type = gain_type
-
-        # Only want album gain for real albums, not single tracks
-        logger.info('Analyzing track set "%s"', self.track_set_key_string)
-        cmd = [replaygain_path]
-        if force:
-            cmd.append("--force")
-        if dry_run:
-            cmd.append("--dry-run")
-        if not self.want_album_gain():
-            cmd.append("--no-album")
-        cmd.extend(self.filenames)
-        logger.debug("Executing command: %s", repr(cmd))
-        output = check_output(cmd)
-        # Print the output all at once to minimize the chance of interleaving
-        if verbose:
-            print(output)
+        if self.has_valid_rgdata():
+            if force:
+                logger.info("Forcing reanalysis of previously-analyzed track set %s", repr(self.track_set_key_string))
+            else:
+                logger.info("Skipping previously-analyzed track set %s", repr(self.track_set_key_string))
+                return
+        else:
+            logger.info('Analyzing track set %s', repr(self.track_set_key_string))
+        audio_files = audiotools.open_files(self.filenames)
+        if len(audio_files) != len(self.filenames):
+            raise Exception("Could not load some files")
+        rginfo = {}
+        for rg in audiotools.calculate_replay_gain(audio_files):
+            rginfo[rg[0].filename] = rg[1:3]
+            # Store the album info with a key of None
+            rginfo[None] = rg[3:5]
+        # Now save the tags
+        for fname in self.RGTracks.keys():
+            track = self.RGTracks[fname]
+            (track.gain, track.peak) = rginfo[fname]
+        # Maybe save album gain
+        if self.want_album_gain():
+            (self.gain, self.peak) = rginfo[None]
+        self.save()
 
     def is_multitrack_album(self):
         '''Returns True if this track set represents at least two
@@ -411,6 +419,34 @@ class RGTrackSet(object):
             return False
         else:
             return True
+
+    def has_valid_rgdata(self):
+        """Returns true if the album's replay gain data appears valid.
+        This means that all tracks have replay gain data, and all
+        tracks have the *same* album gain data (it want_album_gain is True).
+
+        If the album has only one track, or if this album is actually
+        a collection of albumless songs, then only track gain data is
+        checked."""
+        # Make sure every track has valid gain data
+        for t in self.RGTracks.values():
+            if not t.has_valid_rgdata():
+                return False
+        # For "real" albums, check the album gain data
+        if self.want_album_gain():
+            # These will only be non-null if all tracks agree on their
+            # values. See _get_tag.
+            if self.gain and self.peak:
+                return True
+            elif self.gain is None or self.peak is None:
+                return False
+            else:
+                return False
+        else:
+            if self.gain is not None or self.peak is not None:
+                return False
+            else:
+                return True
 
     def report(self):
         """Report calculated replay gain tags."""
@@ -455,27 +491,53 @@ def unique(items, key = None):
             yield x
             seen.add(k)
 
+def is_music_file(file):
+    # Exists?
+    if not os.path.exists(file):
+        logger.debug("File %s does not exist", repr(file))
+        return False
+    if not os.path.getsize(file) > 0:
+        logger.debug("File %s has zero size", repr(file))
+        return False
+    # Readable by Mutagen?
+    try:
+        if not MusicFile(file):
+            logger.debug("File %s is not recognized by Mutagen", repr(file))
+            return False
+    except Exception:
+        logger.debug("File %s is not recognized", repr(file))
+        return False
+    # Readable by audiotools?
+    try:
+        audiotools.open(file)
+    except UnsupportedFile:
+        logger.debug("File %s is not recognized by audiotools", repr(file))
+        return False
+    # OK!
+    return True
+
 def get_all_music_files (paths, ignore_hidden=True):
     '''Recursively search in one or more paths for music files.
 
     By default, hidden files and directories are ignored.'''
-    with stdout_redirected(os.devnull, sys.stderr):
-        for p in paths:
-            p = fullpath(p)
-            if os.path.isdir(p):
-                for root, dirs, files in os.walk(p, followlinks=True):
-                    if ignore_hidden:
-                        files[:] = list(remove_hidden_paths(files))
-                        dirs[:] = list(remove_hidden_paths(dirs))
-                    # Try to load every file as an audio file, and filter the
-                    # ones that aren't actually audio files
-                    more_files = ( MusicFile(os.path.join(root, f), easy=True) for f in files )
-                    for item in ifilter(None, more_files):
-                        yield item
-            else:
-                f = MusicFile(p, easy=True)
-                if f is not None:
-                    yield f
+    # with stdout_redirected(os.devnull, sys.stderr):
+    for p in paths:
+        p = fullpath(p)
+        if os.path.isdir(p):
+            for root, dirs, files in os.walk(p, followlinks=True):
+                logger.debug("Searching for music files in %s", repr(root))
+                if ignore_hidden:
+                    # Modify dirs in place to cut off os.walk
+                    dirs[:] = list(remove_hidden_paths(dirs))
+                    files = remove_hidden_paths(files)
+                files = filter(lambda f: is_music_file(os.path.join(root, f)), files)
+                for f in files:
+                    yield MusicFile(os.path.join(root, f), easy=True)
+        else:
+            logger.debug("Checking for music files at %s", repr(p))
+            f = MusicFile(p, easy=True)
+            if f is not None:
+                yield f
 
 class PickleableMethodCaller(object):
     """Pickleable method caller for multiprocessing.Pool.imap"""
@@ -484,19 +546,20 @@ class PickleableMethodCaller(object):
         self.args = args
         self.kwargs = kwargs
     def __call__(self, obj):
-        return getattr(obj, self.method_name)(*self.args, **self.kwargs)
+        try:
+            return getattr(obj, self.method_name)(*self.args, **self.kwargs)
+        except KeyboardInterrupt:
+            sys.exit(1)
 
 class TrackSetHandler(PickleableMethodCaller):
     """Pickleable callable for multiprocessing.Pool.imap"""
-    def __init__(self, force=False, gain_type="auto", dry_run=False, verbose=False,
-                 replaygain_path="replaygain"):
+    def __init__(self, force=False, gain_type="auto", dry_run=False, verbose=False):
         super(TrackSetHandler, self).__init__(
             "do_gain",
             force = force,
             gain_type = gain_type,
             verbose = verbose,
             dry_run = dry_run,
-            replaygain_path = replaygain_path,
         )
     def __call__(self, track_set):
         try:
@@ -531,8 +594,6 @@ def positive_int(x):
     jobs=(
         "Number of albums to analyze in parallel. The default is the number of cores detected on your system.",
         "option", "j", positive_int),
-    replaygain_path=(
-        "Path to replaygain program. Only required if it is not in your $PATH.", "option", "r", str, None, "PATH_TO_REPLAYGAIN"),
     quiet=(
         "Do not print informational messages.", "flag", "q"),
     verbose=(
@@ -542,13 +603,14 @@ def positive_int(x):
 def main(force_reanalyze=False, include_hidden=False,
          dry_run=False, gain_type='auto',
          jobs=default_job_count(),
-         replaygain_path="replaygain",
          quiet=False, verbose=False,
          *music_dir
          ):
     """Add replaygain tags to your music files."""
+    tqdm = tqdm_real
     if quiet:
         logger.setLevel(logging.WARN)
+        tqdm = tqdm_fake
     elif verbose:
         logger.setLevel(logging.DEBUG)
     else:
@@ -572,8 +634,8 @@ def main(force_reanalyze=False, include_hidden=False,
 
     music_directories = list(unique(map(fullpath, music_dir)))
     logger.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
-    all_music_files = unique(get_all_music_files(music_directories,
-                                                 ignore_hidden=(not include_hidden)))
+    all_music_files = unique(tqdm(get_all_music_files(music_directories,
+                                                      ignore_hidden=(not include_hidden))))
     tracks = [ track_constructor(f) for f in all_music_files ]
 
     # Filter out tracks for which we can't get the length
@@ -588,6 +650,8 @@ def main(force_reanalyze=False, include_hidden=False,
         logger.error("Failed to find any tracks in the directories you specified. Exiting.")
         sys.exit(1)
     track_sets = RGTrackSet.MakeTrackSets(tracks)
+    if (jobs > len(track_sets)):
+        jobs = len(track_sets)
 
     # Remove the earlier bypass of KeyboardInterrupt
     signal.signal(signal.SIGINT, original_handler)
@@ -595,16 +659,31 @@ def main(force_reanalyze=False, include_hidden=False,
     logger.info("Beginning analysis")
 
     handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run, verbose=verbose)
+    # Wrapper that runs the handler in a subprocess, allowing for
+    # parallel operation
+    def wrapped_handler(track_set):
+        p = Process(target=handler, args=(track_set,))
+        try:
+            p.start()
+            p.join()
+            if p.exitcode != 0:
+                raise Exception("Error occurred in subprocess")
+        finally:
+            if p.is_alive():
+                logger.debug("Killing subprocess")
+                p.terminate()
+        return track_set
 
     pool = None
     try:
         if jobs == 1:
             # Sequential
-            handled_track_sets = imap(handler, track_sets)
+            handled_track_sets = map(handler, track_sets)
         else:
-            # Parallel
+            # Parallel (Using process pool doesn't work, so instead we
+            # use Process class within each thread)
             pool = ThreadPool(jobs)
-            handled_track_sets = pool.imap_unordered(handler, track_sets)
+            handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets)
         # Wait for completion
         list(tqdm(handled_track_sets, total=len(track_sets), desc="Analyzing"))
         logger.info("Analysis complete.")
