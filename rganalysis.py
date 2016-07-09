@@ -31,6 +31,11 @@ from multiprocessing.pool import ThreadPool
 from mutagen import File as MusicFile
 from subprocess import check_output
 
+req_version = (3,5)
+cur_version = sys.version_info
+if cur_version < req_version:
+    raise Exception("Your Python version is too old. Please upgrade to version 3.5 or greater.")
+
 def tqdm_fake(iterable, *args, **kwargs):
     return iterable
 try:
