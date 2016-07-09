@@ -4,21 +4,13 @@
 # it under the terms of version 2 (or later) of the GNU General Public
 # License as published by the Free Software Foundation.
 
-from __future__ import print_function
-
 import audiotools
 import logging
-import multiprocessing
-import os
 import os.path
-import plac
 import re
 import sys
-import traceback
 
 from audiotools import UnsupportedFile
-from multiprocessing import Process
-from multiprocessing.pool import ThreadPool
 from mutagen import File as MusicFile
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
@@ -54,12 +46,6 @@ for tag in rg_tags:
     mp4_tagname = "----:com.apple.iTunes:" + tag
     EasyID3.RegisterTXXXKey(tag, id3_tagname)
     EasyMP4Tags.RegisterFreeformKey(tag, mp4_tagname)
-
-def default_job_count():
-    try:
-        return multiprocessing.cpu_count()
-    except Exception:
-        return 1
 
 def fullpath(f):
     """os.path.realpath + expanduser"""
@@ -507,33 +493,3 @@ def get_all_music_files (paths, ignore_hidden=True):
             f = MusicFile(p, easy=True)
             if f is not None:
                 yield f
-
-class PickleableMethodCaller(object):
-    """Pickleable method caller for multiprocessing.Pool.imap"""
-    def __init__(self, method_name, *args, **kwargs):
-        self.method_name = method_name
-        self.args = args
-        self.kwargs = kwargs
-    def __call__(self, obj):
-        try:
-            return getattr(obj, self.method_name)(*self.args, **self.kwargs)
-        except KeyboardInterrupt:
-            sys.exit(1)
-
-class TrackSetHandler(PickleableMethodCaller):
-    """Pickleable callable for multiprocessing.Pool.imap"""
-    def __init__(self, force=False, gain_type="auto", dry_run=False, verbose=False):
-        super(TrackSetHandler, self).__init__(
-            "do_gain",
-            force = force,
-            gain_type = gain_type,
-            verbose = verbose,
-            dry_run = dry_run,
-        )
-    def __call__(self, track_set):
-        try:
-            super(TrackSetHandler, self).__call__(track_set)
-        except Exception:
-            logger.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n",
-                         track_set.track_set_key_string, traceback.format_exc())
-        return track_set
