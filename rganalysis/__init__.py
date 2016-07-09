@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 # Author: Ryan Thompson
 
-# The Analysis class is modified from code found elsewhere. See the
-# notice attached to that class. The Property function was found
-# somewhere on the internet. The rest of the code is mine. Since the
-# Analysis class is GPL2, then so is this file.
-
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of version 2 (or later) of the GNU General Public
 # License as published by the Free Software Foundation.
@@ -32,11 +27,6 @@ from mutagen import File as MusicFile
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
 from subprocess import check_output
-
-req_version = (3,5)
-cur_version = sys.version_info
-if cur_version < req_version:
-    raise Exception("Your Python version is too old. Please upgrade to version 3.5 or greater.")
 
 def tqdm_fake(iterable, *args, **kwargs):
     return iterable
@@ -550,147 +540,3 @@ class TrackSetHandler(PickleableMethodCaller):
         except Exception:
             logger.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
         return track_set
-
-def positive_int(x):
-    i = int(x)
-    if i < 1:
-        raise ValueError()
-    else:
-        return i
-
-@plac.annotations(
-    # arg=(helptext, kind, abbrev, type, choices, metavar)
-    force_reanalyze=(
-        'Reanalyze all files and recalculate replaygain values, even if the files already have valid replaygain tags. Normally, only files missing or inconsistent replaygain tags will be analyzed.',
-        "flag", "f"),
-    include_hidden=(
-        'Do not skip hidden files and directories.',
-        "flag", "i"),
-    gain_type=(
-        'Can be "album", "track", or "auto". If "track", only track gain values will be calculated, and album gain values will be erased. if "album", both track and album gain values will be calculated. If "auto", then "album" mode will be used except in directories that contain a file called "TRACKGAIN" or ".TRACKGAIN". In these directories, "track" mode will be used. The default setting is "auto".',
-        "option", "g", str, ('album', 'track', 'auto'), '(track|album|auto)'),
-    dry_run=("Don't modify any files. Only analyze and report gain.",
-             "flag", "n"),
-    music_dir=(
-        "Directories in which to search for music files.",
-        "positional"),
-    jobs=(
-        "Number of albums to analyze in parallel. The default is the number of cores detected on your system.",
-        "option", "j", positive_int),
-    quiet=(
-        "Do not print informational messages.", "flag", "q"),
-    verbose=(
-        "Print debug messages that are probably only useful if something is going wrong.",
-        "flag", "v"),
-)
-def main(force_reanalyze=False, include_hidden=False,
-         dry_run=False, gain_type='auto',
-         jobs=default_job_count(),
-         quiet=False, verbose=False,
-         *music_dir
-         ):
-    """Add replaygain tags to your music files."""
-    tqdm = tqdm_real
-    if quiet:
-        logger.setLevel(logging.WARN)
-        tqdm = tqdm_fake
-    elif verbose:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)
-
-    # Some pesky functions used below will catch KeyboardInterrupts
-    # inappropriately, so install an alternate handler that bypasses
-    # KeyboardInterrupt instead.
-    def signal_handler(sig, frame):
-        logger.error("Canceled.")
-        os.kill(os.getpid(), signal.SIGTERM)
-    original_handler = signal.signal(signal.SIGINT, signal_handler)
-
-    track_constructor = RGTrack
-    if dry_run:
-        logger.warn('This script is running in "dry run" mode, so no files will actually be modified.')
-        track_constructor = RGTrackDryRun
-    if len(music_dir) == 0:
-        logger.error("You did not specify any music directories or files. Exiting.")
-        sys.exit(1)
-
-    music_directories = list(unique(map(fullpath, music_dir)))
-    logger.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
-    all_music_files = unique(tqdm(get_all_music_files(music_directories,
-                                                      ignore_hidden=(not include_hidden))))
-    tracks = [ track_constructor(f) for f in all_music_files ]
-
-    # Filter out tracks for which we can't get the length
-    for t in tracks[:]:
-        try:
-            t.length_seconds
-        except Exception:
-            logger.error("Track %s appears to be invalid. Skipping.", t.filename)
-            tracks.remove(t)
-
-    if len(tracks) == 0:
-        logger.error("Failed to find any tracks in the directories you specified. Exiting.")
-        sys.exit(1)
-    track_sets = RGTrackSet.MakeTrackSets(tracks)
-    if (jobs > len(track_sets)):
-        jobs = len(track_sets)
-
-    # Remove the earlier bypass of KeyboardInterrupt
-    signal.signal(signal.SIGINT, original_handler)
-
-    logger.info("Beginning analysis")
-
-    handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run, verbose=verbose)
-    # Wrapper that runs the handler in a subprocess, allowing for
-    # parallel operation
-    def wrapped_handler(track_set):
-        p = Process(target=handler, args=(track_set,))
-        try:
-            p.start()
-            p.join()
-            if p.exitcode != 0:
-                raise Exception("Error occurred in subprocess")
-        finally:
-            if p.is_alive():
-                logger.debug("Killing subprocess")
-                p.terminate()
-        return track_set
-
-    pool = None
-    try:
-        if jobs == 1:
-            # Sequential
-            handled_track_sets = map(handler, track_sets)
-        else:
-            # Parallel (Using process pool doesn't work, so instead we
-            # use Process class within each thread)
-            pool = ThreadPool(jobs)
-            handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets)
-        # Wait for completion
-        list(tqdm(handled_track_sets, total=len(track_sets), desc="Analyzing"))
-        logger.info("Analysis complete.")
-    except KeyboardInterrupt:
-        if pool is not None:
-            logger.debug("Terminating process pool")
-            pool.terminate()
-            pool = None
-        raise
-    finally:
-        if pool is not None:
-            logger.debug("Closing transcode process pool")
-            pool.close()
-    if dry_run:
-        logger.warn('This script ran in "dry run" mode, so no files were actually modified.')
-    pass
-
-# Entry point
-def plac_call_main():
-    try:
-        return plac.call(main)
-    except KeyboardInterrupt:
-        logger.error("Canceled.")
-        sys.exit(1)
-
-if __name__=="__main__":
-    plac_call_main()
