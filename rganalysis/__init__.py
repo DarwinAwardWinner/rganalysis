@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# Author: Ryan Thompson
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of version 2 (or later) of the GNU General Public

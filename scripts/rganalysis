@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# Author: Ryan Thompson
 
 from rganalysis import *
 import signal
