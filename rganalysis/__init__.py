@@ -9,18 +9,15 @@ from __future__ import print_function
 
 import audiotools
 import logging
-import math
 import multiprocessing
 import os
 import os.path
 import plac
 import re
-import signal
 import sys
 import traceback
 
 from audiotools import UnsupportedFile
-from contextlib import contextmanager
 from multiprocessing import Process
 from multiprocessing.pool import ThreadPool
 from mutagen import File as MusicFile

@@ -2,6 +2,7 @@
 # Author: Ryan Thompson
 
 from rganalysis import *
+import signal
 
 def positive_int(x):
     i = int(x)
