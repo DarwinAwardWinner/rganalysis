@@ -535,5 +535,6 @@ class TrackSetHandler(PickleableMethodCaller):
         try:
             super(TrackSetHandler, self).__call__(track_set)
         except Exception:
-            logger.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n", track_set.track_set_key_string, traceback.format_exc())
+            logger.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n",
+                         track_set.track_set_key_string, traceback.format_exc())
         return track_set
