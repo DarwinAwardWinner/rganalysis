@@ -53,42 +53,6 @@ logger.addHandler(logging.StreamHandler())
 for handler in logger.handlers:
     handler.setFormatter(logFormatter)
 
-def fileno(file_or_fd):
-    fd = getattr(file_or_fd, 'fileno', lambda: file_or_fd)()
-    if not isinstance(fd, int):
-        raise ValueError("Expected a file (`.fileno()`) or a file descriptor")
-    return fd
-
-# http://stackoverflow.com/a/22434262/125921
-@contextmanager
-def stdout_redirected(to=os.devnull, stdout=None):
-    """Redirect stdout to another file.
-
-    This function performs redirection at the filehandle level, so
-    even direct filehandle manipulation and the stdout of subprocesses
-    are redirected to the specified filehandle.
-
-    """
-    if stdout is None:
-       stdout = sys.stdout
-
-    stdout_fd = fileno(stdout)
-    # copy stdout_fd before it is overwritten
-    #NOTE: `copied` is inheritable on Windows when duplicating a standard stream
-    with os.fdopen(os.dup(stdout_fd), 'wb') as copied:
-        stdout.flush()  # flush library buffers that dup2 knows nothing about
-        try:
-            os.dup2(fileno(to), stdout_fd)  # $ exec >&to
-        except ValueError:  # filename
-            with open(to, 'wb') as to_file:
-                os.dup2(to_file.fileno(), stdout_fd)  # $ exec > to
-        try:
-            yield stdout # allow code to be run with the redirected stdout
-        finally:
-            # restore stdout to its previous value
-            #NOTE: dup2 makes stdout_fd inheritable unconditionally
-            stdout.flush()
-            os.dup2(copied.fileno(), stdout_fd)  # $ exec >&copied
 
 def default_job_count():
     try:
@@ -525,7 +489,6 @@ def get_all_music_files (paths, ignore_hidden=True):
     '''Recursively search in one or more paths for music files.
 
     By default, hidden files and directories are ignored.'''
-    # with stdout_redirected(os.devnull, sys.stderr):
     for p in paths:
         p = fullpath(p)
         if os.path.isdir(p):
