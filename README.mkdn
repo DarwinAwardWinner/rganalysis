@@ -42,20 +42,19 @@ optional arguments:
                         something is going wrong.
 </pre></code>
 
-Note that in addition to the python modules used directly by this
-script, you also need the 'rgain' python module installed, with the
-accompanying `replaygain` script in your `$PATH`. Note that rgain only
-works with Python 2 and also requires the installation of
-[Pycairo](https://cairographics.org/pycairo/),
-[PyGObject](https://wiki.gnome.org/action/show/Projects/PyGObject?action=show&redirect=PyGObject),
-and
-[Gst-Python](https://gstreamer.freedesktop.org/modules/gst-python.html),
-all of which cannot be installed via `pip`, along with all their
-non-python dependencies (Gstreamer, etc.). In Debian/Ubuntu, you can
-just install the "python-rgain" package, which should install all the
-dependencies for you. Since this script is only calling `replaygain`
-as an external script, they need not be installed in the same copy of
-python.
+## Installation
+
+First, you need to install audiotools, which is not available on PyPI.
+You can download the tarball from
+[here](http://audiotools.sourceforge.net/) and install is with `pip
+install`. Then you can install this package from Github using `pip`:
+
+    pip install https://github.com/DarwinAwardWinner/rganalysis/archive/package.zip
+
+Lastly, if you want progress bars in the output, you should also
+install [tqdm](https://pypi.python.org/pypi/tqdm).
+
+Note that rganalysis only works with Python 3.
 
 ## What is an album?
 
