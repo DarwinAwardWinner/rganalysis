@@ -24,5 +24,8 @@ setup(
         'mutagen',
         'plac',
     ],
+    extras_require = {
+        'progress_bars':  ["tqdm"],
+    },
     scripts=['scripts/rganalysis',],
 )
