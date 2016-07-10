@@ -11,6 +11,7 @@ import re
 import sys
 
 from audiotools import UnsupportedFile
+from itertools import groupby
 from mutagen import File as MusicFile
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
@@ -224,6 +225,27 @@ class RGTrackSet(object):
             except KeyError:
                 track_sets[t.track_set_key] = [ t, ]
         return [ cls(track_sets[k]) for k in sorted(track_sets.keys()) ]
+
+    @classmethod
+    def MakeTrackSets(cls, tracks):
+        '''Takes an iterable of RGTrack objects and returns an iterable of
+        RGTrackSet objects, one for each track_set_key represented in
+        the RGTrack objects.
+
+        The input iterable need not be completely sorted, but tracks
+        from the same directory should be yielded consecutively with
+        each other, or else they will not be grouped.
+
+        '''
+        tracks_by_dir = groupby(tracks, lambda tr: os.path.dirname(tr.filename))
+        for (dirname, tracks_in_dir) in tracks_by_dir:
+            track_sets = {}
+            for t in tracks_in_dir:
+                try:
+                    track_sets[t.track_set_key].append(t)
+                except KeyError:
+                    track_sets[t.track_set_key] = [ t, ]
+            yield from ( cls(track_sets[k]) for k in sorted(track_sets.keys()) )
 
     def want_album_gain(self):
         '''Return true if this track set should have album gain tags,

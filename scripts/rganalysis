@@ -71,6 +71,9 @@ def positive_int(x):
     jobs=(
         "Number of albums to analyze in parallel. The default is the number of cores detected on your system.",
         "option", "j", positive_int),
+    low_memory=(
+        "Use less memory by processing directories one by one rather than pre-computing the complete list of files to be processed. This will disable progress bars, but will allow rganalysis to run on very larg music collections without running out of memory.",
+        "flag", "m"),
     quiet=(
         "Do not print informational messages.", "flag", "q"),
     verbose=(
@@ -80,6 +83,7 @@ def positive_int(x):
 def main(force_reanalyze=False, include_hidden=False,
          dry_run=False, gain_type='auto',
          jobs=default_job_count(),
+         low_memory=False,
          quiet=False, verbose=False,
          *music_dir
          ):
@@ -103,16 +107,19 @@ def main(force_reanalyze=False, include_hidden=False,
 
     music_directories = list(unique(map(fullpath, music_dir)))
     logger.info("Searching for music files in the following locations:\n%s", "\n".join(music_directories),)
-    all_music_files = unique(tqdm(get_all_music_files(music_directories,
-                                                      ignore_hidden=(not include_hidden))))
-    tracks = map(track_constructor, all_music_files)
-
-    track_sets = RGTrackSet.MakeTrackSets(tracks)
-    if len(track_sets) == 0:
-        logger.error("Failed to find any tracks in the directories you specified. Exiting.")
-        sys.exit(1)
-    if (jobs > len(track_sets)):
-        jobs = len(track_sets)
+    all_music_files = get_all_music_files(music_directories,
+                                          ignore_hidden=(not include_hidden))
+    if low_memory:
+        tracks = map(track_constructor, all_music_files)
+        track_sets = RGTrackSet.MakeTrackSets(tracks)
+    else:
+        tracks = map(track_constructor, tqdm(all_music_files, desc="Searching"))
+        track_sets = list(RGTrackSet.MakeTrackSets(tracks))
+        if len(track_sets) == 0:
+            logger.error("Failed to find any tracks in the directories you specified. Exiting.")
+            sys.exit(1)
+        if (jobs > len(track_sets)):
+            jobs = len(track_sets)
 
     logger.info("Beginning analysis")
 
@@ -139,11 +146,13 @@ def main(force_reanalyze=False, include_hidden=False,
             handled_track_sets = map(handler, track_sets)
         else:
             # Parallel (Using process pool doesn't work, so instead we
-            # use Process class within each thread)
+            # use Process instance within each thread)
             pool = ThreadPool(jobs)
             handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets)
         # Wait for completion
-        list(tqdm(handled_track_sets, total=len(track_sets), desc="Analyzing"))
+        iter_len = None if low_memory else len(track_sets)
+        for ts in tqdm(handled_track_sets, total=iter_len, desc="Analyzing"):
+            pass
         logger.info("Analysis complete.")
     except KeyboardInterrupt:
         if pool is not None:
