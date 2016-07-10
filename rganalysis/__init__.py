@@ -447,6 +447,20 @@ def unique(items, key = None):
             yield x
             seen.add(k)
 
+def remove_redundant_paths(paths):
+    '''Filter out any paths that are subpaths of other paths.
+
+    Paths should be normalized before passing to this function.
+
+    '''
+    seen_paths = set()
+    for p in unique(sorted(paths)):
+        if any(p.startswith(sp) for sp in seen_paths):
+            continue
+        else:
+            yield p
+            seen_paths.add(p)
+
 def is_music_file(file):
     # Exists?
     if not os.path.exists(file):
@@ -475,9 +489,11 @@ def is_music_file(file):
 def get_all_music_files (paths, ignore_hidden=True):
     '''Recursively search in one or more paths for music files.
 
-    By default, hidden files and directories are ignored.'''
-    for p in paths:
-        p = fullpath(p)
+    By default, hidden files and directories are ignored.
+
+    '''
+    paths = map(fullpath, paths)
+    for p in remove_redundant_paths(paths):
         if os.path.isdir(p):
             for root, dirs, files in os.walk(p, followlinks=True):
                 logger.debug("Searching for music files in %s", repr(root))
