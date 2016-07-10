@@ -461,6 +461,19 @@ def unique(items, key = None):
             yield x
             seen.add(k)
 
+def is_subpath(path, directory):
+    '''Returns True of path is inside directory.
+
+    Note that a path is considered to be inside itself.
+
+    '''
+    path = fullpath(path)
+    directory = fullpath(directory)
+    relative = os.path.relpath(path, directory)
+    return not (relative == os.pardir or
+                relative.startswith(os.pardir + os.sep) or
+                relative == os.curdir)
+
 def remove_redundant_paths(paths):
     '''Filter out any paths that are subpaths of other paths.
 
@@ -468,8 +481,9 @@ def remove_redundant_paths(paths):
 
     '''
     seen_paths = set()
+    # Sorting ensures that parent directories appear before children
     for p in unique(sorted(paths)):
-        if any(p.startswith(sp) for sp in seen_paths):
+        if any(is_subpath(p, seen) for seen in seen_paths):
             continue
         else:
             yield p
