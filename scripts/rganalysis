@@ -112,23 +112,15 @@ def main(force_reanalyze=False, include_hidden=False,
         sys.exit(1)
 
     music_directories = list(unique(map(fullpath, music_dir)))
-    logger.info("Searching for music files in the following directories:\n%s", "\n".join(music_directories),)
+    logger.info("Searching for music files in the following locations:\n%s", "\n".join(music_directories),)
     all_music_files = unique(tqdm(get_all_music_files(music_directories,
                                                       ignore_hidden=(not include_hidden))))
-    tracks = [ track_constructor(f) for f in all_music_files ]
+    tracks = map(track_constructor, all_music_files)
 
-    # Filter out tracks for which we can't get the length
-    for t in tracks[:]:
-        try:
-            t.length_seconds
-        except Exception:
-            logger.error("Track %s appears to be invalid. Skipping.", t.filename)
-            tracks.remove(t)
-
-    if len(tracks) == 0:
+    track_sets = RGTrackSet.MakeTrackSets(tracks)
+    if len(track_sets) == 0:
         logger.error("Failed to find any tracks in the directories you specified. Exiting.")
         sys.exit(1)
-    track_sets = RGTrackSet.MakeTrackSets(tracks)
     if (jobs > len(track_sets)):
         jobs = len(track_sets)
 
