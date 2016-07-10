@@ -5,9 +5,9 @@ help text (`rganalysis.py --help`) contains (almost) all you need to
 know:
 
 <pre><code>
-usage: rganalysis.py [-h] [-f] [-i] [-n] [-g (track|album|auto)] [-j 4]
-                     [-r PATH_TO_REPLAYGAIN] [-q] [-v]
-                     [music_dir [music_dir ...]]
+usage: rganalysis [-h] [-f] [-i] [-n] [-g (track|album|auto)] [-j 4] [-m] [-q]
+                  [-v]
+                  [music_dir [music_dir ...]]
 
 Add replaygain tags to your music files.
 
@@ -34,9 +34,11 @@ optional arguments:
                         default setting is "auto".
   -j 4, --jobs 4        Number of albums to analyze in parallel. The default
                         is the number of cores detected on your system.
-  -r PATH_TO_REPLAYGAIN, --replaygain-path PATH_TO_REPLAYGAIN
-                        Path to replaygain program. Only required if it is not
-                        in your $PATH.
+  -m, --low-memory      Use less memory by processing directories one by one
+                        rather than pre-computing the complete list of files
+                        to be processed. This will disable progress bars, but
+                        will allow rganalysis to run on very larg music
+                        collections without running out of memory.
   -q, --quiet           Do not print informational messages.
   -v, --verbose         Print debug messages that are probably only useful if
                         something is going wrong.
