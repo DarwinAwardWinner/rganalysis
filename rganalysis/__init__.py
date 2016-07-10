@@ -48,7 +48,7 @@ for tag in rg_tags:
     EasyMP4Tags.RegisterFreeformKey(tag, mp4_tagname)
 
 def fullpath(f):
-    """os.path.realpath + expanduser"""
+    '''os.path.realpath + expanduser'''
     return os.path.realpath(os.path.expanduser(f))
 
 def Property(function):
@@ -189,9 +189,9 @@ class RGTrack(object):
         self.track.save()
 
 class RGTrackDryRun(RGTrack):
-    """Same as RGTrack, but the save() method does nothing.
+    '''Same as RGTrack, but the save() method does nothing.
 
-    This means that the file will never be modified."""
+    This means that the file will never be modified.'''
     def save(self):
         pass
 
@@ -328,7 +328,7 @@ class RGTrackSet(object):
             except KeyError: pass
 
     def do_gain(self, force=False, gain_type=None, dry_run=False, verbose=False):
-        """Analyze all tracks in the album, and add replay gain tags
+        '''Analyze all tracks in the album, and add replay gain tags
         to the tracks based on the analysis.
 
         If force is False (the default) and the album already has
@@ -337,7 +337,7 @@ class RGTrackSet(object):
         gain_type can be one of "album", "track", or "auto", as
         described in the help. If provided to this method, it will sef
         the object's gain_type field.
-        """
+        '''
         if self.has_valid_rgdata():
             if force:
                 logger.info("Forcing reanalysis of previously-analyzed track set %s", repr(self.track_set_key_string))
@@ -377,13 +377,13 @@ class RGTrackSet(object):
             return True
 
     def has_valid_rgdata(self):
-        """Returns true if the album's replay gain data appears valid.
+        '''Returns true if the album's replay gain data appears valid.
         This means that all tracks have replay gain data, and all
         tracks have the *same* album gain data (it want_album_gain is True).
 
         If the album has only one track, or if this album is actually
         a collection of albumless songs, then only track gain data is
-        checked."""
+        checked.'''
         # Make sure every track has valid gain data
         for t in self.RGTracks.values():
             if not t.has_valid_rgdata():
@@ -405,7 +405,7 @@ class RGTrackSet(object):
                 return True
 
     def report(self):
-        """Report calculated replay gain tags."""
+        '''Report calculated replay gain tags.'''
         for k in sorted(self.filenames):
             track = self.RGTracks[k]
             logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain, track.peak)
@@ -415,7 +415,7 @@ class RGTrackSet(object):
             logger.info("Did not set album gain tags for %s.", self.track_set_key_string)
 
     def save(self):
-        """Save the calculated replaygain tags"""
+        '''Save the calculated replaygain tags'''
         self.report()
         for k in self.filenames:
             track = self.RGTracks[k]

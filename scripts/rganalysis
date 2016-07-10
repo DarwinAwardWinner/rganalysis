@@ -18,7 +18,7 @@ def default_job_count():
         return 1
 
 class PickleableMethodCaller(object):
-    """Pickleable method caller for multiprocessing.Pool.imap"""
+    '''Pickleable method caller for multiprocessing.Pool.imap'''
     def __init__(self, method_name, *args, **kwargs):
         self.method_name = method_name
         self.args = args
@@ -30,7 +30,7 @@ class PickleableMethodCaller(object):
             sys.exit(1)
 
 class TrackSetHandler(PickleableMethodCaller):
-    """Pickleable callable for multiprocessing.Pool.imap"""
+    '''Pickleable callable for multiprocessing.Pool.imap'''
     def __init__(self, force=False, gain_type="auto", dry_run=False, verbose=False):
         super(TrackSetHandler, self).__init__(
             "do_gain",
@@ -85,7 +85,7 @@ def main(force_reanalyze=False, include_hidden=False,
          quiet=False, verbose=False,
          *music_dir
          ):
-    """Add replaygain tags to your music files."""
+    '''Add replaygain tags to your music files.'''
     tqdm = tqdm_real
     if quiet:
         logger.setLevel(logging.WARN)
