@@ -46,10 +46,10 @@ optional arguments:
 
 First, you need to install audiotools, which is not available on PyPI.
 You can download the tarball from
-[here](http://audiotools.sourceforge.net/) and install is with `pip
+[here](http://audiotools.sourceforge.net/) and install it with `pip
 install`. Then you can install this package from Github using `pip`:
 
-    pip install https://github.com/DarwinAwardWinner/rganalysis/archive/package.zip
+    pip install https://github.com/DarwinAwardWinner/rganalysis/archive/audiotools.zip
 
 Lastly, if you want progress bars in the output, you should also
 install [tqdm](https://pypi.python.org/pypi/tqdm).
