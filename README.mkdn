@@ -51,7 +51,7 @@ You can download the tarball from
 [here](http://audiotools.sourceforge.net/) and install it with `pip
 install`. Then you can install this package from Github using `pip`:
 
-    pip install https://github.com/DarwinAwardWinner/rganalysis/archive/audiotools.zip
+    pip install https://github.com/DarwinAwardWinner/rganalysis/archive/master.zip
 
 Lastly, if you want progress bars in the output, you should also
 install [tqdm](https://pypi.python.org/pypi/tqdm).
