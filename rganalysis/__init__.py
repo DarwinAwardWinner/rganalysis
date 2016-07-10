@@ -17,14 +17,6 @@ from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
 from subprocess import check_output
 
-def tqdm_fake(iterable, *args, **kwargs):
-    return iterable
-try:
-    from tqdm import tqdm as tqdm_real
-except ImportError:
-    # Fallback: No progress bars
-    tqdm_real = tqdm_fake
-
 # Set up logging
 logFormatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
