@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 
 import multiprocessing
-import os
 import plac
-import signal
 import traceback
 
 from multiprocessing import Process
@@ -95,14 +93,6 @@ def main(force_reanalyze=False, include_hidden=False,
     else:
         logger.setLevel(logging.INFO)
 
-    # Some pesky functions used below will catch KeyboardInterrupts
-    # inappropriately, so install an alternate handler that bypasses
-    # KeyboardInterrupt instead.
-    def signal_handler(sig, frame):
-        logger.error("Canceled.")
-        os.kill(os.getpid(), signal.SIGTERM)
-    original_handler = signal.signal(signal.SIGINT, signal_handler)
-
     track_constructor = RGTrack
     if dry_run:
         logger.warn('This script is running in "dry run" mode, so no files will actually be modified.')
@@ -123,9 +113,6 @@ def main(force_reanalyze=False, include_hidden=False,
         sys.exit(1)
     if (jobs > len(track_sets)):
         jobs = len(track_sets)
-
-    # Remove the earlier bypass of KeyboardInterrupt
-    signal.signal(signal.SIGINT, original_handler)
 
     logger.info("Beginning analysis")
 
