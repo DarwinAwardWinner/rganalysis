@@ -352,6 +352,11 @@ class RGTrackSet(object):
         described in the help. If provided to this method, it will sef
         the object's gain_type field.
         '''
+        if gain_type is not None:
+            self.gain_type = gain_type
+        # This performs some additional checks
+        gain_type = "album" if self.want_album_gain() else "track"
+        assert gain_type in ("album", "track")
         if self.has_valid_rgdata():
             if force:
                 logger.info("Forcing reanalysis of previously-analyzed track set %s", repr(self.track_set_key_string))
@@ -368,13 +373,17 @@ class RGTrackSet(object):
             rginfo[rg[0].filename] = rg[1:3]
             # Store the album info with a key of None
             rginfo[None] = rg[3:5]
-        # Now save the tags
+        # Save track gains
         for fname in self.RGTracks.keys():
             track = self.RGTracks[fname]
             (track.gain, track.peak) = rginfo[fname]
-        # Maybe save album gain
-        if self.want_album_gain():
+        # Set or unset album gain
+        if gain_type == "album":
             (self.gain, self.peak) = rginfo[None]
+        else:
+            del self.gain
+            del self.peak
+        # Now save the tags to the files
         self.save()
 
     def is_multitrack_album(self):
