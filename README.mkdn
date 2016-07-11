@@ -70,12 +70,19 @@ the FLACs too quiet, or vice versa.
 Anyway, this script considers two tracks to belong to the same "track
 set" for the purposes of calculating audiophile gain if:
 
-* They have the same album name tag
-* They have the same disc number tag (or lack thereof)
 * They are in the same directory on the filesystem
 * They are both the same music format (MP3, OGG, FLAC, etc.)
+* They have the same "album" tag (preferring the "albumsort" tag if
+  present)
+* They have the same "albumartist" (preferring the "albumartistsort"
+  tag if present, and falling back to "artistsort" then "artist" if
+  there is no album artist tagged)
+* They have the same "discnumber" tag (or lack thereof)
 
-I may add "same album artist" to this list in the future
+This means if you have a multi-artist album, you'll need to set the
+"albumartist" tag to the same value (e.g. "Various Artists") on all
+songs in the album in order for all the songs to be grouped as a
+single album. You can still set a different "artist" tag on each song.
 
 ## See also
 
