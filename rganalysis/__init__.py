@@ -10,6 +10,7 @@ import os.path
 import re
 import sys
 
+from abc import ABCMeta, abstractmethod
 from audiotools import UnsupportedFile
 from itertools import groupby
 from mutagen import File as MusicFile
@@ -84,32 +85,52 @@ def get_full_classname(mf):
     t = type(mf)
     return "{}.{}".format(t.__module__, t.__qualname__)
 
-def compute_gain(fnames, album=True):
-    '''Compute gain for files.
+class GainComputer(metaclass=ABCMeta):
+    '''Abstract base class for gain-computing backends.
 
-    Returns a nested dict, where the outer keys are file names, the
-    inner keys are replay gain tag names, and the values are the
-    string value that should be written for that tag on that file. The
-    tags for each file should include at a minimum
-    "replaygain_track_gain" and "replaygain_track_peak". If album is
-    True, they should also include "replaygain_album_gain" and
-    "replaygain_album_peak". They might also include
-    "replaygain_reference_loudness" if the backend supplies it.
+    Subclasses should implement a __call__ method that takes a list of
+    file names and returns a dict of dicts of replaygain tags for each
+    file. See the docstring for __call__ for more info.
 
     '''
-    audio_files = audiotools.open_files(fnames)
-    if len(audio_files) != len(fnames):
-        raise Exception("Could not load some files")
-    rginfo = {}
-    tag_order = (
-        "replaygain_track_gain",
-        "replaygain_track_peak",
-        "replaygain_album_gain",
-        "replaygain_album_peak",
-    )
-    for rg in audiotools.calculate_replay_gain(audio_files):
-        rginfo[rg[0].filename] = dict(zip(tag_order, rg[1:]))
-    return rginfo
+    def __call__(self, fnames, album=True):
+        '''Compute gain for files.
+
+        Should return a nested dict, where the outer keys are file
+        names, the inner keys are replay gain tag names, and the
+        values are the string value that should be written for that
+        tag on that file. The tags for each file should include at a
+        minimum "replaygain_track_gain" and "replaygain_track_peak".
+        If album is True, they should also include
+        "replaygain_album_gain" and "replaygain_album_peak". They
+        might also include "replaygain_reference_loudness" if the
+        backend supplies it. The backend may return any other tags,
+        but they will be ignored. (In particular, it's ok for a
+        backend to ignore album=False and compute album gain anyway.)
+
+        This is an abstract method that must be implemented by any
+        subclass.
+
+        '''
+        raise NotImplementedError("This method should be overridden in a subclass")
+
+class AudiotoolsGainComputer(GainComputer):
+    def __call__(self, fnames, album=True):
+        audio_files = audiotools.open_files(fnames)
+        if len(audio_files) != len(fnames):
+            raise Exception("Could not load some files")
+        rginfo = {}
+        tag_order = (
+            "replaygain_track_gain",
+            "replaygain_track_peak",
+            "replaygain_album_gain",
+            "replaygain_album_peak",
+        )
+        for rg in audiotools.calculate_replay_gain(audio_files):
+            rginfo[rg[0].filename] = dict(zip(tag_order, rg[1:]))
+        return rginfo
+
+compute_gain = AudiotoolsGainComputer()
 
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
