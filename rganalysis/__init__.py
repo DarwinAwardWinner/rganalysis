@@ -84,6 +84,33 @@ def get_full_classname(mf):
     t = type(mf)
     return "{}.{}".format(t.__module__, t.__qualname__)
 
+def compute_gain(fnames, album=True):
+    '''Compute gain for files.
+
+    Returns a nested dict, where the outer keys are file names, the
+    inner keys are replay gain tag names, and the values are the
+    string value that should be written for that tag on that file. The
+    tags for each file should include at a minimum
+    "replaygain_track_gain" and "replaygain_track_peak". If album is
+    True, they should also include "replaygain_album_gain" and
+    "replaygain_album_peak". They might also include
+    "replaygain_reference_loudness" if the backend supplies it.
+
+    '''
+    audio_files = audiotools.open_files(fnames)
+    if len(audio_files) != len(fnames):
+        raise Exception("Could not load some files")
+    rginfo = {}
+    tag_order = (
+        "replaygain_track_gain",
+        "replaygain_track_peak",
+        "replaygain_album_gain",
+        "replaygain_album_peak",
+    )
+    for rg in audiotools.calculate_replay_gain(audio_files):
+        rginfo[rg[0].filename] = dict(zip(tag_order, rg[1:]))
+    return rginfo
+
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
     for replaygain information.'''
@@ -160,6 +187,22 @@ class RGTrack(object):
     def peak():
         doc = "Track peak dB, or None if the track does not have replaygain tags."
         tag = 'replaygain_track_peak'
+        def fget(self):
+            try:
+                return(self.track[tag])
+            except KeyError:
+                return None
+        def fset(self, value):
+            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
+            self.track[tag] = str(value)
+        def fdel(self):
+            if self.track.has_key(tag):
+                del self.track[tag]
+
+    @Property
+    def reference_loudness():
+        doc = "Track reference loudness, or None if the track does not have this tag."
+        tag = 'replaygain_reference_loudness'
         def fget(self):
             try:
                 return(self.track[tag])
@@ -279,6 +322,17 @@ class RGTrackSet(object):
             self._del_tag(tag)
 
     @Property
+    def ref_loudness():
+        doc = "Album reference loudness, or None if tracks do not all agree on it."
+        tag = 'replaygain_reference_loudness'
+        def fget(self):
+            return(self._get_tag(tag))
+        def fset(self, value):
+            self._set_tag(tag, value)
+        def fdel(self):
+            self._del_tag(tag)
+
+    @Property
     def filenames():
         def fget(self):
             return sorted(self.RGTracks.keys())
@@ -365,21 +419,24 @@ class RGTrackSet(object):
                 return
         else:
             logger.info('Analyzing track set %s', repr(self.track_set_key_string))
-        audio_files = audiotools.open_files(self.filenames)
-        if len(audio_files) != len(self.filenames):
-            raise Exception("Could not load some files")
-        rginfo = {}
-        for rg in audiotools.calculate_replay_gain(audio_files):
-            rginfo[rg[0].filename] = rg[1:3]
-            # Store the album info with a key of None
-            rginfo[None] = rg[3:5]
+        rginfo = compute_gain(self.filenames)
         # Save track gains
         for fname in self.RGTracks.keys():
             track = self.RGTracks[fname]
-            (track.gain, track.peak) = rginfo[fname]
+            track_rginfo = rginfo[fname]
+            (track.gain, track.peak) = (track_rginfo["replaygain_track_gain"],
+                                        track_rginfo["replaygain_track_peak"])
+            # Try to set reference loudness, but don't throw an error
+            # if the backend does not provide it.
+            try:
+                track.ref_loudness = track_rginfo["replaygain_reference_loudness"]
+            except KeyError:
+                pass
         # Set or unset album gain
         if gain_type == "album":
-            (self.gain, self.peak) = rginfo[None]
+            album_rginfo = next(iter(rginfo.values()))
+            (self.gain, self.peak) = (track_rginfo["replaygain_album_gain"],
+                                      track_rginfo["replaygain_album_peak"])
         else:
             del self.gain
             del self.peak
