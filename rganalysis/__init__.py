@@ -448,9 +448,9 @@ class RGTrackSet(object):
         '''Report calculated replay gain tags.'''
         for k in sorted(self.filenames):
             track = self.RGTracks[k]
-            logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain, track.peak)
+            logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain[0], track.peak[0])
         if self.want_album_gain():
-            logger.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string, self.gain, self.peak)
+            logger.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string, self.gain[0], self.peak[0])
         else:
             logger.info("Did not set album gain tags for %s.", self.track_set_key_string)
 
