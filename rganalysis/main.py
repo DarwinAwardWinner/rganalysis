@@ -161,7 +161,7 @@ def main(force_reanalyze=False, include_hidden=False,
             p.start()
             p.join()
             if p.exitcode != 0:
-                logger.error("Subprocess exited with code %s for %s", p.exitcode, track_set.track_set.track_set_key_string)
+                logger.error("Subprocess exited with code %s for %s", p.exitcode, track_set.track_set_key_string)
         finally:
             if p.is_alive():
                 logger.debug("Killing subprocess")
