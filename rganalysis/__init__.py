@@ -333,7 +333,7 @@ class RGTrackSet(object):
         try:
             tags = set(tuple(t.track[tag]) for t in self.RGTracks.values())
             if len(tags) == 1:
-                return tags.pop()
+                return list(tags.pop())
             elif len(tags) > 1:
                 return False
             else:
