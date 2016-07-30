@@ -40,7 +40,6 @@ class Bs1770gainGainComputer(GainComputer):
         # Need to escape file names within the xml before passing it
         # to a real parser
         xml_text = escape_file_names(xml_text)
-        print(xml_text)
         tree = etree.fromstring(xml_text)
         album = tree.xpath("/bs1770gain/album/summary")[0]
         album_gain = album.xpath("./integrated/@lu")[0]

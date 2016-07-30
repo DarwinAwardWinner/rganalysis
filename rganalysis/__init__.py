@@ -144,7 +144,7 @@ class RGTrack(object):
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             self.track[tag] = str(value)
         def fdel(self):
-            if self.track.has_key(tag):
+            if tag in self.track.keys():
                 del self.track[tag]
 
     @Property
@@ -160,7 +160,7 @@ class RGTrack(object):
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             self.track[tag] = str(value)
         def fdel(self):
-            if self.track.has_key(tag):
+            if tag in self.track.keys():
                 del self.track[tag]
 
     @Property
@@ -176,7 +176,7 @@ class RGTrack(object):
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             self.track[tag] = str(value)
         def fdel(self):
-            if self.track.has_key(tag):
+            if tag in self.track.keys():
                 del self.track[tag]
 
     @Property
@@ -282,7 +282,7 @@ class RGTrackSet(object):
             self._del_tag(tag)
 
     @Property
-    def ref_loudness():
+    def reference_loudness():
         doc = "Album reference loudness, or None if tracks do not all agree on it."
         tag = 'replaygain_reference_loudness'
         def fget(self):
@@ -389,9 +389,9 @@ class RGTrackSet(object):
             # Try to set reference loudness, but don't throw an error
             # if the backend does not provide it.
             try:
-                track.ref_loudness = track_rginfo["replaygain_reference_loudness"]
+                track.reference_loudness = track_rginfo["replaygain_reference_loudness"]
             except KeyError:
-                pass
+                del track.reference_loudness
         # Set or unset album gain
         if gain_type == "album":
             album_rginfo = next(iter(rginfo.values()))
@@ -446,6 +446,8 @@ class RGTrackSet(object):
 
     def report(self):
         '''Report calculated replay gain tags.'''
+        if self.reference_loudness:
+            logger.info("Set reference loudness to %s for %s.", self.reference_loudness, self.track_set_key_string)
         for k in sorted(self.filenames):
             track = self.RGTracks[k]
             logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain[0], track.peak[0])
