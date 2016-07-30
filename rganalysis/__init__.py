@@ -4,28 +4,19 @@
 # it under the terms of version 2 (or later) of the GNU General Public
 # License as published by the Free Software Foundation.
 
-import audiotools
-import logging
+import inspect
 import os.path
 import re
 import sys
 
-from abc import ABCMeta, abstractmethod
-from audiotools import UnsupportedFile
 from itertools import groupby
 from mutagen import File as MusicFile
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
 from subprocess import check_output
 
-# Set up logging
-logFormatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.handlers = []
-logger.addHandler(logging.StreamHandler())
-for handler in logger.handlers:
-    handler.setFormatter(logFormatter)
+from rganalysis.common import logger
+from rganalysis.backends import GainComputer
 
 rg_tags = (
     "replaygain_track_gain",
@@ -84,53 +75,6 @@ def get_discnumber(mf):
 def get_full_classname(mf):
     t = type(mf)
     return "{}.{}".format(t.__module__, t.__qualname__)
-
-class GainComputer(metaclass=ABCMeta):
-    '''Abstract base class for gain-computing backends.
-
-    Subclasses should implement a __call__ method that takes a list of
-    file names and returns a dict of dicts of replaygain tags for each
-    file. See the docstring for __call__ for more info.
-
-    '''
-    def __call__(self, fnames, album=True):
-        '''Compute gain for files.
-
-        Should return a nested dict, where the outer keys are file
-        names, the inner keys are replay gain tag names, and the
-        values are the string value that should be written for that
-        tag on that file. The tags for each file should include at a
-        minimum "replaygain_track_gain" and "replaygain_track_peak".
-        If album is True, they should also include
-        "replaygain_album_gain" and "replaygain_album_peak". They
-        might also include "replaygain_reference_loudness" if the
-        backend supplies it. The backend may return any other tags,
-        but they will be ignored. (In particular, it's ok for a
-        backend to ignore album=False and compute album gain anyway.)
-
-        This is an abstract method that must be implemented by any
-        subclass.
-
-        '''
-        raise NotImplementedError("This method should be overridden in a subclass")
-
-class AudiotoolsGainComputer(GainComputer):
-    def __call__(self, fnames, album=True):
-        audio_files = audiotools.open_files(fnames)
-        if len(audio_files) != len(fnames):
-            raise Exception("Could not load some files")
-        rginfo = {}
-        tag_order = (
-            "replaygain_track_gain",
-            "replaygain_track_peak",
-            "replaygain_album_gain",
-            "replaygain_album_peak",
-        )
-        for rg in audiotools.calculate_replay_gain(audio_files):
-            rginfo[rg[0].filename] = dict(zip(tag_order, rg[1:]))
-        return rginfo
-
-compute_gain = AudiotoolsGainComputer()
 
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
@@ -257,33 +201,23 @@ class RGTrackSet(object):
 
     track_gain_signal_filenames = ('TRACKGAIN', '.TRACKGAIN', '_TRACKGAIN')
 
-    def __init__(self, tracks, gain_type="auto"):
+    def __init__(self, tracks, gain_backend, gain_type="auto"):
         self.RGTracks = { str(t.filename): t for t in tracks }
         if len(self.RGTracks) < 1:
             raise ValueError("Need at least one track to analyze")
         keys = set(t.track_set_key for t in self.RGTracks.values())
         if (len(keys) != 1):
             raise ValueError("All tracks in an album must have the same key")
+        if not isinstance(gain_backend, GainComputer):
+            raise ValueError("Gain backend must be a GainComputer instance")
+        self.gain_backend = gain_backend
         self.gain_type = gain_type
 
     def __repr__(self):
         return "RGTrackSet(%s, gain_type=%s)" % (repr(self.RGTracks.values()), repr(self.gain_type))
 
     @classmethod
-    def MakeTrackSets(cls, tracks):
-        '''Takes an unsorted list of RGTrack objects and returns a
-        list of RGTrackSet objects, one for each track_set_key represented in
-        the RGTrack objects.'''
-        track_sets = {}
-        for t in tracks:
-            try:
-                track_sets[t.track_set_key].append(t)
-            except KeyError:
-                track_sets[t.track_set_key] = [ t, ]
-        return [ cls(track_sets[k]) for k in sorted(track_sets.keys()) ]
-
-    @classmethod
-    def MakeTrackSets(cls, tracks):
+    def MakeTrackSets(cls, tracks, gain_backend):
         '''Takes an iterable of RGTrack objects and returns an iterable of
         RGTrackSet objects, one for each track_set_key represented in
         the RGTrack objects.
@@ -292,7 +226,13 @@ class RGTrackSet(object):
         from the same directory should be yielded consecutively with
         each other, or else they will not be grouped.
 
+        Second argument 'backend' should be an instance of
+        GainComputer that will be passed to the RGTrackSet
+        constructor. In addition, its supports_file method will be
+        used to filter the tracks.
+
         '''
+        tracks = (t for t in tracks if gain_backend.supports_file(t.filename))
         tracks_by_dir = groupby(tracks, lambda tr: os.path.dirname(tr.filename))
         for (dirname, tracks_in_dir) in tracks_by_dir:
             track_sets = {}
@@ -301,7 +241,7 @@ class RGTrackSet(object):
                     track_sets[t.track_set_key].append(t)
                 except KeyError:
                     track_sets[t.track_set_key] = [ t, ]
-            yield from ( cls(track_sets[k]) for k in sorted(track_sets.keys()) )
+            yield from ( cls(track_sets[k], gain_backend=gain_backend) for k in sorted(track_sets.keys()) )
 
     def want_album_gain(self):
         '''Return true if this track set should have album gain tags,
@@ -440,7 +380,7 @@ class RGTrackSet(object):
                 return
         else:
             logger.info('Analyzing track set %s', repr(self.track_set_key_string))
-        rginfo = compute_gain(self.filenames)
+        rginfo = self.gain_backend.compute_gain(self.filenames)
         # Save track gains
         for fname in self.RGTracks.keys():
             track = self.RGTracks[fname]
@@ -591,12 +531,6 @@ def is_music_file(file):
             return False
     except Exception:
         logger.debug("File %s is not recognized", repr(file))
-        return False
-    # Readable by audiotools?
-    try:
-        audiotools.open(file)
-    except UnsupportedFile:
-        logger.debug("File %s is not recognized by audiotools", repr(file))
         return False
     # OK!
     return True
