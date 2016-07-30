@@ -1,13 +1,17 @@
 import os.path
 import sys
 
-from lxml import etree
 from os import getenv
 from shutil import which
 from subprocess import Popen, PIPE, check_output, CalledProcessError
 
 from rganalysis.common import logger
 from rganalysis.backends import GainComputer, register_backend, BackendUnavailableException
+
+try:
+    from lxml import etree
+except ImportError:
+    raise BackendUnavailableException("Unable to use the bs1770gain backend: The lxml python module is not installed.")
 
 bs1770gain_path = getenv("BS1770GAIN_PATH") or which("bs1770gain")
 if not bs1770gain_path:
