@@ -1,9 +1,11 @@
 import os.path
 import sys
+import re
 
 from os import getenv
 from shutil import which
 from subprocess import Popen, PIPE, check_output, CalledProcessError
+from xml.sax.saxutils import quoteattr
 
 from rganalysis.common import logger
 from rganalysis.backends import GainComputer, register_backend, BackendUnavailableException
@@ -17,14 +19,29 @@ bs1770gain_path = getenv("BS1770GAIN_PATH") or which("bs1770gain")
 if not bs1770gain_path:
     raise BackendUnavailableException("Unable to use the bs1770gain backend: could not find bs1770gain executable in $PATH. To use this backend, ensure bs1770gain is in your $PATH or set BS1770GAIN_PATH environment variable to the path of the bs1770gain executable.")
 
+def munge_filname_match_obj(m):
+    quoted_fname = quoteattr(m.group(1))
+    return 'file={fname}'.format(fname=quoted_fname)
+
+def escape_file_names(text):
+    return re.sub('file="(.*)"', munge_filname_match_obj, text)
+
 class Bs1770gainGainComputer(GainComputer):
     def compute_gain(self, fnames, album=True):
         basenames_to_fnames = { os.path.basename(f): f for f in fnames }
         if len(basenames_to_fnames) != len(fnames):
             raise ValueError("The bs1770gain backend cannot handle multiple files with the same basename.")
         cmd = [bs1770gain_path, '--replaygain', '--integrated', '--samplepeak', '--xml', ] + fnames
+        logger.debug("Running command: %s", repr(cmd))
         p = Popen(cmd, stdout=PIPE)
-        tree = etree.parse(p.stdout)
+        xml_text = p.communicate()[0].decode(sys.getdefaultencoding())
+        if p.wait() != 0:
+            raise CalledProcessError(p.returncode, p.args)
+        # Need to escape file names within the xml before passing it
+        # to a real parser
+        xml_text = escape_file_names(xml_text)
+        print(xml_text)
+        tree = etree.fromstring(xml_text)
         album = tree.xpath("/bs1770gain/album/summary")[0]
         album_gain = album.xpath("./integrated/@lu")[0]
         album_peak = album.xpath("./sample-peak/@factor")[0]
@@ -40,8 +57,6 @@ class Bs1770gainGainComputer(GainComputer):
                 "replaygain_album_gain": album_gain,
                 "replaygain_album_peak": album_peak,
             }
-        if p.wait() != 0:
-            raise CalledProcessError(p.returncode, p.args)
         return rginfo
 
     def supports_file(self, fname):
