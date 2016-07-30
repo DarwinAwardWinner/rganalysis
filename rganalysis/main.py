@@ -116,7 +116,7 @@ def main(force_reanalyze=False, include_hidden=False,
         for bname in known_backends:
             try:
                 gain_backend = get_backend(bname)
-                logger.info("Using %s backend to compute ReplayGain", bname)
+                logger.info("Selected the %s backend to compute ReplayGain", bname)
                 break
             except BackendUnavailableException:
                 pass
@@ -124,7 +124,7 @@ def main(force_reanalyze=False, include_hidden=False,
             raise BackendUnavailableException("Could not find any usable backends.")
     else:
         gain_backend = get_backend(backend)
-        logger.info("Using %s backend to compute ReplayGain", backend)
+        logger.info("Using the %s backend to compute ReplayGain", backend)
 
     track_constructor = RGTrack
     if dry_run:
