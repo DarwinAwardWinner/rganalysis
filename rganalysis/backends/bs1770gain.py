@@ -19,13 +19,6 @@ bs1770gain_path = getenv("BS1770GAIN_PATH") or which("bs1770gain")
 if not bs1770gain_path:
     raise BackendUnavailableException("Unable to use the bs1770gain backend: could not find bs1770gain executable in $PATH. To use this backend, ensure bs1770gain is in your $PATH or set BS1770GAIN_PATH environment variable to the path of the bs1770gain executable.")
 
-def munge_filname_match_obj(m):
-    quoted_fname = quoteattr(m.group(1))
-    return 'file={fname}'.format(fname=quoted_fname)
-
-def escape_file_names(text):
-    return re.sub('file="(.*)"', munge_filname_match_obj, text)
-
 class Bs1770gainGainComputer(GainComputer):
     def compute_gain(self, fnames, album=True):
         basenames_to_fnames = { os.path.basename(f): f for f in fnames }
@@ -37,9 +30,6 @@ class Bs1770gainGainComputer(GainComputer):
         xml_text = p.communicate()[0].decode(sys.getdefaultencoding())
         if p.wait() != 0:
             raise CalledProcessError(p.returncode, p.args)
-        # Need to escape file names within the xml before passing it
-        # to a real parser
-        xml_text = escape_file_names(xml_text)
         tree = etree.fromstring(xml_text)
         album = tree.xpath("/bs1770gain/album/summary")[0]
         album_gain = album.xpath("./integrated/@lu")[0]
