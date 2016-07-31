@@ -5,8 +5,8 @@ help text (`rganalysis.py --help`) contains (almost) all you need to
 know:
 
 <pre><code>
-usage: rganalysis [-h] [-f] [-i] [-n] [-g (track|album|auto)] [-j 4] [-m] [-q]
-                  [-v]
+usage: rganalysis [-h] [-f] [-i] [-n] [-g (track|album|auto)]
+                  [-b (audiotools|bs1770gain|auto)] [-j 4] [-m] [-q] [-v]
                   [music_dir [music_dir ...]]
 
 Add replaygain tags to your music files.
@@ -32,6 +32,9 @@ optional arguments:
                         contain a file called "TRACKGAIN" or ".TRACKGAIN". In
                         these directories, "track" mode will be used. The
                         default setting is "auto".
+  -b (audiotools|bs1770gain|auto), --backend (audiotools|bs1770gain|auto)
+                        Gain computing backend to use. Different backends have
+                        different prerequisites.
   -j 4, --jobs 4        Number of albums to analyze in parallel. The default
                         is the number of cores detected on your system.
   -m, --low-memory      Use less memory by processing directories one by one
