@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
     name='rganalysis',
-    version='3.1',
+    version='3.2',
     description='A script to add ReplayGain tags to your music library',
     url='https://github.com/DarwinAwardWinner/rganalysis',
     author='Ryan C. Thompson',
