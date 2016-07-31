@@ -20,12 +20,12 @@ setup(
     keywords='audio replaygain',
     packages=find_packages(exclude=['scripts']),
     install_requires=[
-        'audiotools',
         'mutagen',
         'plac',
     ],
     extras_require = {
-        'progress_bars':  ["tqdm"],
+        'progress_bars':  ['tqdm'],
+        'audiotools_backend': ['audiotools'],
     },
     scripts=['scripts/rganalysis',],
 )
