@@ -19,15 +19,15 @@ from rganalysis.common import logger
 from rganalysis.backends import GainComputer
 
 rg_tags = (
-    "replaygain_track_gain",
-    "replaygain_track_peak",
-    "replaygain_album_gain",
-    "replaygain_album_peak",
-    "replaygain_reference_loudness",
+    'replaygain_track_gain',
+    'replaygain_track_peak',
+    'replaygain_album_gain',
+    'replaygain_album_peak',
+    'replaygain_reference_loudness',
 )
 for tag in rg_tags:
     # Support replaygain tags for MP3 and M4A/MP4
-    id3_tagname = tag.upper()
+    id3_tagname = tag
     mp4_tagname = "----:com.apple.iTunes:" + tag
     EasyID3.RegisterTXXXKey(tag, id3_tagname)
     EasyMP4Tags.RegisterFreeformKey(tag, mp4_tagname)
