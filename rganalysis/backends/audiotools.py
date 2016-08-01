@@ -5,7 +5,7 @@ try:
     import audiotools
     from audiotools import UnsupportedFile
 except ImportError as ex:
-    raise BackendUnavailableException("Unable to use the audiotools backend: Could not load audiotools module. ")
+    raise BackendUnavailableException("Unable to use the audiotools backend: Could not load audiotools module.")
 
 class AudiotoolsGainComputer(GainComputer):
     def compute_gain(self, fnames, album=True):
@@ -19,8 +19,18 @@ class AudiotoolsGainComputer(GainComputer):
             "replaygain_album_gain",
             "replaygain_album_peak",
         )
+        tag_formats = (
+            '{:.2f} dB',
+            '{:.6f}',
+            '{:.2f} dB',
+            '{:.6f}',
+        )
         for rg in audiotools.calculate_replay_gain(audio_files):
-            rginfo[rg[0].filename] = dict(zip(tag_order, rg[1:]))
+            rginfo[rg[0].filename] = {
+                tagname: tagformat.format(tagvalue) for
+                (tagname, tagvalue, tagformat) in
+                zip(tag_order, rg[1:], tag_formats)
+            }
         return rginfo
 
     def supports_file(self, fname):
