@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
     name='rganalysis',
-    version='3.2',
+    version='3.3',
     description='A script to add ReplayGain tags to your music library',
     url='https://github.com/DarwinAwardWinner/rganalysis',
     author='Ryan C. Thompson',
@@ -21,6 +21,7 @@ setup(
     packages=find_packages(exclude=['scripts']),
     install_requires=[
         'mutagen',
+        'parse',
         'plac',
     ],
     extras_require = {

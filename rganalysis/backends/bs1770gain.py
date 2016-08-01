@@ -32,14 +32,14 @@ class Bs1770gainGainComputer(GainComputer):
             raise CalledProcessError(p.returncode, p.args)
         tree = etree.fromstring(xml_text)
         album = tree.xpath("/bs1770gain/album/summary")[0]
-        album_gain = album.xpath("./integrated/@lu")[0]
-        album_peak = album.xpath("./sample-peak/@factor")[0]
+        album_gain = float(album.xpath("./integrated/@lu")[0])
+        album_peak = float(album.xpath("./sample-peak/@factor")[0])
         tracks = tree.xpath("/bs1770gain/album/track")
         rginfo = {}
         for track in tracks:
             track_name = track.xpath("./@file")[0]
-            track_gain = track.xpath("./integrated/@lu")[0]
-            track_peak = track.xpath("./sample-peak/@factor")[0]
+            track_gain = float(track.xpath("./integrated/@lu")[0])
+            track_peak = float(track.xpath("./sample-peak/@factor")[0])
             rginfo[basenames_to_fnames[track_name]] = {
                 "replaygain_track_gain": track_gain,
                 "replaygain_track_peak": track_peak,

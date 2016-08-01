@@ -4,19 +4,19 @@
 # it under the terms of version 2 (or later) of the GNU General Public
 # License as published by the Free Software Foundation.
 
-import inspect
 import os.path
 import re
 import sys
 
 from itertools import groupby
 from mutagen import File as MusicFile
-from mutagen import FileType
+from mutagen import FileType as MusicFileType
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
 
-from rganalysis.common import logger
+from rganalysis.common import logger, format_gain, format_peak, parse_gain, parse_peak
 from rganalysis.backends import GainComputer
+from rganalysis.fixup_id3 import fixup_ID3
 
 rg_tags = (
     'replaygain_track_gain',
@@ -26,10 +26,8 @@ rg_tags = (
     'replaygain_reference_loudness',
 )
 for tag in rg_tags:
-    # Support replaygain tags for MP3 and M4A/MP4
-    id3_tagname = tag
+    # Support replaygain tags for M4A/MP4
     mp4_tagname = "----:com.apple.iTunes:" + tag
-    EasyID3.RegisterTXXXKey(tag, id3_tagname)
     EasyMP4Tags.RegisterFreeformKey(tag, mp4_tagname)
 
 def fullpath(f):
@@ -100,7 +98,7 @@ class RGTrack(object):
     for replaygain information.'''
 
     def __init__(self, track):
-        if isinstance(track, FileType):
+        if isinstance(track, MusicFileType):
             self.track = track
         else:
             self.track = MusicFile(track, easy=True)
@@ -156,80 +154,103 @@ class RGTrack(object):
 
     @Property
     def gain():
-        doc = "Track gain value, or None if the track does not have replaygain tags."
+        doc = '''Track gain value, or None if the track does not have replaygain tags.
+
+        Gain values are generally stored rounded to 2 decimal places,
+        so you should not expect to get exactly the same value out as
+        you put in.'''
         tag = 'replaygain_track_gain'
         def fget(self):
             try:
-                return(self.track[tag])
-            except KeyError:
+                tval = self.track[tag][0]
+                gain = parse_gain(tval)
+                return gain
+            except (KeyError, ValueError):
                 return None
         def fset(self, value):
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            self.track[tag] = str(value)
+            if value is None:
+                del self.gain
+            else:
+                self.track[tag] = format_gain(value)
         def fdel(self):
             if tag in self.track.keys():
                 del self.track[tag]
 
     @Property
     def peak():
-        doc = "Track peak dB, or None if the track does not have replaygain tags."
+        doc = '''Track peak dB, or None if the track does not have replaygain tags.
+
+        Peak values are generally stored rounded to 6 decimal places,
+        so you should not expect to get exactly the same value out as
+        you put in.'''
         tag = 'replaygain_track_peak'
         def fget(self):
             try:
-                return(self.track[tag])
+                tval = self.track[tag][0]
+                peak = parse_peak(tval)
+                return peak
+            except (KeyError, ValueError):
+                if p:
+                    return p.named['value']
             except KeyError:
                 return None
         def fset(self, value):
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            self.track[tag] = str(value)
-        def fdel(self):
-            if tag in self.track.keys():
-                del self.track[tag]
-
-    @Property
-    def reference_loudness():
-        doc = "Track reference loudness, or None if the track does not have this tag."
-        tag = 'replaygain_reference_loudness'
-        def fget(self):
-            try:
-                return(self.track[tag])
-            except KeyError:
-                return None
-        def fset(self, value):
-            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            self.track[tag] = str(value)
+            if value is None:
+                del self.peak
+            else:
+                self.track[tag] = format_peak(value)
         def fdel(self):
             if tag in self.track.keys():
                 del self.track[tag]
 
     @Property
     def album_gain():
-        doc = "Track gain value, or None if the track does not have replaygain tags."
+        doc = '''Album gain value, or None if the album does not have replaygain tags.
+
+        Gain values are generally stored rounded to 2 decimal places,
+        so you should not expect to get exactly the same value out as
+        you put in.'''
         tag = 'replaygain_album_gain'
         def fget(self):
             try:
-                return(self.track[tag])
-            except KeyError:
+                tval = self.track[tag][0]
+                gain = parse_gain(tval)
+                return gain
+            except (KeyError, ValueError):
                 return None
         def fset(self, value):
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            self.track[tag] = str(value)
+            if value is None:
+                del self.album_gain
+            else:
+                self.track[tag] = format_gain(value)
         def fdel(self):
             if tag in self.track.keys():
                 del self.track[tag]
 
     @Property
     def album_peak():
-        doc = "Track peak dB, or None if the track does not have replaygain tags."
+        doc = '''Album peak dB, or None if the album does not have replaygain tags.
+
+        Peak values are generally stored rounded to 6 decimal places,
+        so you should not expect to get exactly the same value out as
+        you put in.'''
         tag = 'replaygain_album_peak'
         def fget(self):
             try:
-                return(self.track[tag])
-            except KeyError:
+                tval = self.track[tag][0]
+                peak = parse_peak(tval)
+                return peak
+            except (KeyError, ValueError):
                 return None
         def fset(self, value):
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            self.track[tag] = str(value)
+            if value is None:
+                del self.album_peak
+            else:
+                self.track[tag] = format_peak(value)
         def fdel(self):
             if tag in self.track.keys():
                 del self.track[tag]
@@ -239,15 +260,52 @@ class RGTrack(object):
         def fget(self):
             return self.track.info.length
 
-    def save(self):
-        #print 'Saving "%s" in %s' % (os.path.basename(self.filename), os.path.dirname(self.filename))
+    def cleanup_tags(self):
+        '''Delete any ReplayGain tags from track.
+
+        This dicards any unsaved changes, then modifies and saves the
+        track's tags on disk and then reloads the new tags from
+        disk.
+
+        '''
+        tags_to_clean = list(rg_tags)
+        tags_to_clean.extend('QuodLibet::' + tag for tag in list(tags_to_clean))
+        tags_to_clean.extend('TXXX:' + tag for tag in list(tags_to_clean))
+        tags_to_clean.extend(['RVA2:track', 'RVA2:album'])
+        tags_to_clean = set( tag.lower() for tag in list(tags_to_clean) )
+        # Need a non-easy interface for proper ID3 cleanup
+        t = MusicFile(self.filename, easy=False)
+        tags_to_delete = []
+        for k in t.keys():
+            if k.lower() in tags_to_clean:
+                tags_to_delete.append(k)
+        for k in tags_to_delete:
+            logger.debug("Deleting tag: %s", repr(k))
+            del t[k]
+        t.save()
+        # Re-init to pick up tag changes
+        new_track = type(self.track)(self.filename)
+        self.__init__(new_track)
+
+    def save(self, cleanup=True, fixup_id3=True):
+        if cleanup:
+            (tgain, tpeak, again, apeak) = \
+                (self.gain, self.peak, self.album_gain, self.album_peak)
+            self.cleanup_tags()
+            (self.gain, self.peak, self.album_gain, self.album_peak) = \
+                (tgain, tpeak, again, apeak)
         self.track.save()
+        if fixup_id3:
+            fixup_ID3(self.filename)
 
 class RGTrackDryRun(RGTrack):
-    '''Same as RGTrack, but the save() method does nothing.
+    '''Same as RGTrack, but file-modifying methods do nothing.
 
     This means that the file will never be modified.'''
     def save(self):
+        pass
+
+    def cleanup_tags(self):
         pass
 
 class RGTrackSet(object):
@@ -316,10 +374,14 @@ class RGTrackSet(object):
 
     @Property
     def gain():
-        doc = "Album gain value, or None if tracks do not all agree on it."
+        doc = '''Album gain value, or None if tracks do not all agree on it.
+
+        Gain values are generally stored rounded to 2 decimal places,
+        so you should not expect to get exactly the same value out as
+        you put in.'''
         def fget(self):
             try:
-                return value_if_all_equal(tuple(t.album_gain) for t in self.RGTracks.values())
+                return value_if_all_equal(t.album_gain for t in self.RGTracks.values())
             except TypeError:
                 return None
         def fset(self, value):
@@ -331,10 +393,14 @@ class RGTrackSet(object):
 
     @Property
     def peak():
-        doc = "Album peak value, or None if tracks do not all agree on it."
+        doc = '''Album peak value, or None if tracks do not all agree on it.
+
+        Peak values are generally stored rounded to 6 decimal places,
+        so you should not expect to get exactly the same value out as
+        you put in.'''
         def fget(self):
             try:
-                return value_if_all_equal(tuple(t.album_peak) for t in self.RGTracks.values())
+                return value_if_all_equal(t.album_peak for t in self.RGTracks.values())
             except TypeError:
                 return None
         def fset(self, value):
@@ -343,22 +409,6 @@ class RGTrackSet(object):
         def fdel(self):
             for t in self.RGTracks.values():
                 del t.album_peak
-
-    @Property
-    def reference_loudness():
-        doc = "Album reference loudness, or None if tracks do not all agree on it."
-        tag = 'replaygain_reference_loudness'
-        def fget(self):
-            try:
-                return value_if_all_equal(tuple(t.reference_loudness) for t in self.RGTracks.values())
-            except TypeError:
-                return None
-        def fset(self, value):
-            for t in self.RGTracks.values():
-                t.reference_loudness = value
-        def fdel(self):
-            for t in self.RGTracks.values():
-                del t.reference_loudness
 
     @Property
     def filenames():
@@ -454,12 +504,6 @@ class RGTrackSet(object):
             track_rginfo = rginfo[fname]
             (track.gain, track.peak) = (track_rginfo["replaygain_track_gain"],
                                         track_rginfo["replaygain_track_peak"])
-            # Try to set reference loudness, but don't throw an error
-            # if the backend does not provide it.
-            try:
-                track.reference_loudness = track_rginfo["replaygain_reference_loudness"]
-            except KeyError:
-                del track.reference_loudness
         # Set or unset album gain
         if gain_type == "album":
             album_rginfo = next(iter(rginfo.values()))
@@ -514,13 +558,11 @@ class RGTrackSet(object):
 
     def report(self):
         '''Report calculated replay gain tags.'''
-        if self.reference_loudness:
-            logger.info("Set reference loudness to %s for %s.", self.reference_loudness, self.track_set_key_string)
         for k in sorted(self.filenames):
             track = self.RGTracks[k]
-            logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain[0], track.peak[0])
+            logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain, track.peak)
         if self.want_album_gain():
-            logger.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string, self.gain[0], self.peak[0])
+            logger.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string, self.gain, self.peak)
         else:
             logger.info("Did not set album gain tags for %s.", self.track_set_key_string)
 
