@@ -11,6 +11,7 @@ import sys
 
 from itertools import groupby
 from mutagen import File as MusicFile
+from mutagen import FileType
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
 
@@ -48,6 +49,25 @@ def Property(function):
     function()
     return property(**func_locals)
 
+def value_if_all_equal(values, error_on_multi=False):
+    '''If all values in iterable are equal, return one of them.
+
+    If error_on_multi is True and there are 2 or more non-identical
+    values, raises ValueError. Otherwise, return None. (Also returns
+    None for an empty iterable.)
+
+    "All equal" is determined by constructing a set and verifying that
+    it has cardinality 1.
+
+    '''
+    s = set(values)
+    if len(s) == 1:
+        return s.pop()
+    if error_on_multi and len(s) > 1:
+        raise ValueError("Not all values were equal.")
+    else:
+        return None
+
 def get_multi(d, keys, default=None):
     '''Like "dict.get", but keys is a list of keys to try.
 
@@ -80,7 +100,10 @@ class RGTrack(object):
     for replaygain information.'''
 
     def __init__(self, track):
-        self.track = track
+        if isinstance(track, FileType):
+            self.track = track
+        else:
+            self.track = MusicFile(track, easy=True)
 
     def __repr__(self):
         return "RGTrack(MusicFile({}, easy=True))".format(repr(self.filename))
@@ -180,6 +203,38 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
+    def album_gain():
+        doc = "Track gain value, or None if the track does not have replaygain tags."
+        tag = 'replaygain_album_gain'
+        def fget(self):
+            try:
+                return(self.track[tag])
+            except KeyError:
+                return None
+        def fset(self, value):
+            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
+            self.track[tag] = str(value)
+        def fdel(self):
+            if tag in self.track.keys():
+                del self.track[tag]
+
+    @Property
+    def album_peak():
+        doc = "Track peak dB, or None if the track does not have replaygain tags."
+        tag = 'replaygain_album_peak'
+        def fget(self):
+            try:
+                return(self.track[tag])
+            except KeyError:
+                return None
+        def fset(self, value):
+            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
+            self.track[tag] = str(value)
+        def fdel(self):
+            if tag in self.track.keys():
+                del self.track[tag]
+
+    @Property
     def length_seconds():
         def fget(self):
             return self.track.info.length
@@ -262,35 +317,48 @@ class RGTrackSet(object):
     @Property
     def gain():
         doc = "Album gain value, or None if tracks do not all agree on it."
-        tag = 'replaygain_album_gain'
         def fget(self):
-            return(self._get_tag(tag))
+            try:
+                return value_if_all_equal(tuple(t.album_gain) for t in self.RGTracks.values())
+            except TypeError:
+                return None
         def fset(self, value):
-            self._set_tag(tag, value)
+            for t in self.RGTracks.values():
+                t.album_gain = value
         def fdel(self):
-            self._del_tag(tag)
+            for t in self.RGTracks.values():
+                del t.album_gain
 
     @Property
     def peak():
         doc = "Album peak value, or None if tracks do not all agree on it."
-        tag = 'replaygain_album_peak'
         def fget(self):
-            return(self._get_tag(tag))
+            try:
+                return value_if_all_equal(tuple(t.album_peak) for t in self.RGTracks.values())
+            except TypeError:
+                return None
         def fset(self, value):
-            self._set_tag(tag, value)
+            for t in self.RGTracks.values():
+                t.album_peak = value
         def fdel(self):
-            self._del_tag(tag)
+            for t in self.RGTracks.values():
+                del t.album_peak
 
     @Property
     def reference_loudness():
         doc = "Album reference loudness, or None if tracks do not all agree on it."
         tag = 'replaygain_reference_loudness'
         def fget(self):
-            return(self._get_tag(tag))
+            try:
+                return value_if_all_equal(tuple(t.reference_loudness) for t in self.RGTracks.values())
+            except TypeError:
+                return None
         def fset(self, value):
-            self._set_tag(tag, value)
+            for t in self.RGTracks.values():
+                t.reference_loudness = value
         def fdel(self):
-            self._del_tag(tag)
+            for t in self.RGTracks.values():
+                del t.reference_loudness
 
     @Property
     def filenames():
@@ -323,21 +391,21 @@ class RGTrackSet(object):
             return next(iter(self.RGTracks.values())).directory
 
     def _get_tag(self, tag):
-        '''Get the value of a tag, only if all tracks in the album
-        have the same value for that tag. If the tracks disagree on
-        the value, return False. If any of the tracks is missing the
-        value entirely, return None.
+        '''Get the value of a tag, only if all tracks in the album have the
+        same value for that tag. If all the tracks have the tag but
+        disagree on the value, return False. If any of the tracks is
+        missing the value entirely, return None.
 
         In particular, note that None and False have different
-        meanings.'''
+        meanings.
+
+        '''
         try:
-            tags = set(tuple(t.track[tag]) for t in self.RGTracks.values())
-            if len(tags) == 1:
-                return list(tags.pop())
-            elif len(tags) > 1:
-                return False
-            else:
-                return None
+            return value_if_all_equal((tuple(t.track[tag]) for t in
+                                       self.RGTracks.values()),
+                                      error_on_multi=True)
+        except ValueError:
+            return False
         except KeyError:
             return None
 
