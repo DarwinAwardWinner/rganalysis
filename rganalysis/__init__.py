@@ -47,25 +47,6 @@ def Property(function):
     function()
     return property(**func_locals)
 
-def value_if_all_equal(values, error_on_multi=False):
-    '''If all values in iterable are equal, return one of them.
-
-    If error_on_multi is True and there are 2 or more non-identical
-    values, raises ValueError. Otherwise, return None. (Also returns
-    None for an empty iterable.)
-
-    "All equal" is determined by constructing a set and verifying that
-    it has cardinality 1.
-
-    '''
-    s = set(values)
-    if len(s) == 1:
-        return s.pop()
-    if error_on_multi and len(s) > 1:
-        raise ValueError("Not all values were equal.")
-    else:
-        return None
-
 def get_multi(d, keys, default=None):
     '''Like "dict.get", but keys is a list of keys to try.
 
@@ -109,7 +90,7 @@ class RGTrack(object):
     def has_valid_rgdata(self):
         '''Returns True if the track has valid replay gain tags. The
         tags are not checked for accuracy, only existence.'''
-        return self.gain and self.peak
+        return self.gain is not None and self.peak is not None
 
     @Property
     def filename():
@@ -316,7 +297,7 @@ class RGTrackSet(object):
     def __init__(self, tracks, gain_backend, gain_type="auto"):
         self.RGTracks = { str(t.filename): t for t in tracks }
         if len(self.RGTracks) < 1:
-            raise ValueError("Need at least one track to analyze")
+            raise ValueError("Track set must contain at least one track")
         keys = set(t.track_set_key for t in self.RGTracks.values())
         if (len(keys) != 1):
             raise ValueError("All tracks in an album must have the same key")
@@ -381,8 +362,8 @@ class RGTrackSet(object):
         you put in.'''
         def fget(self):
             try:
-                return value_if_all_equal(t.album_gain for t in self.RGTracks.values())
-            except TypeError:
+                return self._get_common_value_for_all_tracks(lambda t: t.album_gain)
+            except (TypeError, ValueError, KeyError):
                 return None
         def fset(self, value):
             for t in self.RGTracks.values():
@@ -400,8 +381,8 @@ class RGTrackSet(object):
         you put in.'''
         def fget(self):
             try:
-                return value_if_all_equal(t.album_peak for t in self.RGTracks.values())
-            except TypeError:
+                return self._get_common_value_for_all_tracks(lambda t: t.album_peak)
+            except (TypeError, ValueError, KeyError):
                 return None
         def fset(self, value):
             for t in self.RGTracks.values():
@@ -440,24 +421,34 @@ class RGTrackSet(object):
         def fget(self):
             return next(iter(self.RGTracks.values())).directory
 
-    def _get_tag(self, tag):
-        '''Get the value of a tag, only if all tracks in the album have the
-        same value for that tag. If all the tracks have the tag but
-        disagree on the value, return False. If any of the tracks is
-        missing the value entirely, return None.
+    def _get_common_value_for_all_tracks(self, func):
+        '''Return the common value of running func on each track.
 
-        In particular, note that None and False have different
-        meanings.
+        If the function returns different values for different tracks,
+        raises ValueError. Does not attempt to catch any exceptions
+        raised by the function itself.
+
+        '''
+        values = { func(t) for t in self.RGTracks.values() }
+        if len(values) > 1:
+            raise ValueError("Function did not return the same value for all tracks.")
+        return values.pop()
+
+    def _get_tag(self, tag):
+        '''Get the value of a tag for the album.
+
+        Only returns a tag's value if all tracks in the album have the
+        same value for that tag. If all the tracks have the tag but
+        disagree on the value, raises ValueError. If one or more of
+        the tracks is missing the tag entirely, raises KeyError.
 
         '''
         try:
-            return value_if_all_equal((tuple(t.track[tag]) for t in
-                                       self.RGTracks.values()),
-                                      error_on_multi=True)
+            # Will raise KeyError on missing tag
+            return self._get_common_value_for_all_tracks(lambda t: t[tag])
+        # More informative error message
         except ValueError:
-            return False
-        except KeyError:
-            return None
+            raise ValueError("Tracks have different values for {!r} tag: {!r}".format(tag, tag_values))
 
     def _set_tag(self, tag, value):
         '''Set tag to value in all tracks in the album.'''
@@ -544,17 +535,9 @@ class RGTrackSet(object):
         if self.want_album_gain():
             # These will only be non-null if all tracks agree on their
             # values. See _get_tag.
-            if self.gain and self.peak:
-                return True
-            elif self.gain is None or self.peak is None:
-                return False
-            else:
-                return False
+            return self.gain is not None and self.peak is not None
         else:
-            if self.gain is not None or self.peak is not None:
-                return False
-            else:
-                return True
+            return self.gain is None and self.peak is None
 
     def report(self):
         '''Report calculated replay gain tags.'''
