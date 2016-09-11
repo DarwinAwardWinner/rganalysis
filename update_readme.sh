@@ -2,6 +2,7 @@
 
 cd $(dirname $0)
 
+export PYTHONPATH="./rganalysis:$PYTHONPATH"
 SCRIPT=./scripts/rganalysis
 $SCRIPT --help &>/dev/null || {
     echo "Cannot run rganalysis.py:"

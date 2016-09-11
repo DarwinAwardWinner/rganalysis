@@ -81,7 +81,7 @@ def positive_int(x):
         "Number of albums to analyze in parallel. The default is the number of cores detected on your system.",
         "option", "j", positive_int),
     low_memory=(
-        "Use less memory by processing directories one by one rather than pre-computing the complete list of files to be processed. This will disable progress bars, but will allow rganalysis to run on very larg music collections without running out of memory.",
+        "Use less memory by processing directories one by one rather than pre-computing the complete list of files to be processed. This will disable progress bars, but will allow rganalysis to run on very large music collections without running out of memory.",
         "flag", "m"),
     quiet=(
         "Do not print informational messages.", "flag", "q"),

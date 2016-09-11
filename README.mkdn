@@ -40,7 +40,7 @@ optional arguments:
   -m, --low-memory      Use less memory by processing directories one by one
                         rather than pre-computing the complete list of files
                         to be processed. This will disable progress bars, but
-                        will allow rganalysis to run on very larg music
+                        will allow rganalysis to run on very large music
                         collections without running out of memory.
   -q, --quiet           Do not print informational messages.
   -v, --verbose         Print debug messages that are probably only useful if
