@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict, Iterable
 
 from rganalysis.common import logger
 from rganalysis.backends import GainComputer, register_backend, BackendUnavailableException
@@ -10,7 +10,8 @@ except ImportError as ex:
     raise BackendUnavailableException("Unable to use the audiotools backend: Could not load audiotools module. ")
 
 class AudiotoolsGainComputer(GainComputer):
-    def compute_gain(self, fnames: List[str], album: bool = True) -> Dict[str, Dict[str, float]]:
+    def compute_gain(self, fnames: Iterable[str], album: bool = True) -> Dict[str, Dict[str, float]]:
+        fnames = list(fnames)
         audio_files = audiotools.open_files(fnames)
         if len(audio_files) != len(fnames):
             raise Exception("Could not load some files")

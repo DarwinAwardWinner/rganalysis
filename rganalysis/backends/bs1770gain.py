@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict, Iterable
 
 import os.path
 import sys
@@ -22,7 +22,8 @@ if not bs1770gain_path:
     raise BackendUnavailableException("Unable to use the bs1770gain backend: could not find bs1770gain executable in $PATH. To use this backend, ensure bs1770gain is in your $PATH or set BS1770GAIN_PATH environment variable to the path of the bs1770gain executable.")
 
 class Bs1770gainGainComputer(GainComputer):
-    def compute_gain(self, fnames: List[str], album: bool = True) -> Dict[str, Dict[str, float]]:
+    def compute_gain(self, fnames: Iterable[str], album: bool = True) -> Dict[str, Dict[str, float]]:
+        fnames = list(fnames)
         basenames_to_fnames = { os.path.basename(f): f for f in fnames }
         if len(basenames_to_fnames) != len(fnames):
             raise ValueError("The bs1770gain backend cannot handle multiple files with the same basename.")

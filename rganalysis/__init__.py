@@ -41,7 +41,7 @@ def fullpath(f: str) -> str:
 def Property(function: Callable) -> Callable:
     keys = 'fget', 'fset', 'fdel'
     func_locals = {'doc':function.__doc__}
-    def probe_func(frame, event, arg):
+    def probe_func(frame, event, arg): # type: ignore
         if event == 'return':
             locals = frame.f_locals
             func_locals.update(dict((k,locals.get(k)) for k in keys))
@@ -469,7 +469,7 @@ class RGTrackSet(object):
                 return
         else:
             logger.info('Analyzing track set %s', repr(self.track_set_key_string()))
-        rginfo = self.gain_backend.compute_gain(cast(Sequence[str], self.filenames))
+        rginfo = self.gain_backend.compute_gain(self.filenames)
         # Save track gains
         for fname in self.RGTracks.keys():
             track = self.RGTracks[fname]
@@ -520,7 +520,7 @@ class RGTrackSet(object):
 
     def report(self) -> None:
         '''Report calculated replay gain tags.'''
-        for k in sorted(cast(List[str], self.filenames)):
+        for k in self.filenames:
             track = self.RGTracks[k]
             logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain, track.peak)
         if self.want_album_gain():
@@ -531,7 +531,7 @@ class RGTrackSet(object):
     def save(self) -> None:
         '''Save the calculated replaygain tags'''
         self.report()
-        for k in cast(List[str], self.filenames):
+        for k in self.filenames:
             track = self.RGTracks[k]
             track.save()
 

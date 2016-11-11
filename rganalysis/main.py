@@ -160,7 +160,7 @@ def main(force_reanalyze: bool = False,
     handler = TrackSetHandler(force=force_reanalyze, gain_type=gain_type, dry_run=dry_run, verbose=verbose)
     # Wrapper that runs the handler in a subprocess, allowing for
     # parallel operation
-    def wrapped_handler(track_set):
+    def wrapped_handler(track_set: RGTrackSet) -> RGTrackSet:
         # https://github.com/python/mypy/issues/797
         p = Process(target=handler, args=(track_set,)) # type: ignore
         try:

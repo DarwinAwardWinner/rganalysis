@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict, Iterable
 
 from abc import ABCMeta, abstractmethod
 from importlib import import_module
@@ -29,7 +29,7 @@ class GainComputer(metaclass=ABCMeta):
     '''
 
     @abstractmethod
-    def compute_gain(self, fnames: List[str], album: bool = True) -> Dict[str, Dict[str, float]]:
+    def compute_gain(self, fnames: Iterable[str], album: bool = True) -> Dict[str, Dict[str, float]]:
         '''Compute gain for files.
 
         Should return a nested dict, where the outer keys are file
@@ -87,11 +87,14 @@ def get_backend(name: str) -> GainComputer:
 
 class NullGainComputer(GainComputer):
     '''The null gain computer supports no files.'''
-    def compute_gain(self, fnames: List[str], album: bool = True) -> Dict[str, Dict[str, float]]:
-        if len(fnames) == 0:
-            return {}
-        else:
+    def compute_gain(self, fnames: Iterable[str], album: bool = True) -> Dict[str, Dict[str, float]]:
+        try:
+            next(iter(fnames))
             raise Exception("Unimplemented")
+        except StopIteration:
+            # Even NullGainComputer can compute gain on an empty track
+            # set
+            return {}
 
     def supports_file(self, fname: str) -> bool:
         return False
