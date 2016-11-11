@@ -1,3 +1,5 @@
+from typing import List, Dict
+
 from rganalysis.common import logger
 from rganalysis.backends import GainComputer, register_backend, BackendUnavailableException
 

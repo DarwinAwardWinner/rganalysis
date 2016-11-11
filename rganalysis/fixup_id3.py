@@ -1,10 +1,10 @@
+from typing import Union, cast
+
 from mutagen import File as MusicFile
 from mutagen import FileType as MusicFileType
 import mutagen.id3 as id3
 
 from rganalysis.common import format_gain, format_peak
-
-from typing import Union, cast
 
 def fixup_ID3(fname: Union[str, MusicFileType]) -> None:
     '''Convert RVA2 tags to TXXX:replaygain_* tags.

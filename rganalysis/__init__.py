@@ -4,6 +4,10 @@
 # it under the terms of version 2 (or later) of the GNU General Public
 # License as published by the Free Software Foundation.
 
+from typing import (
+    Any, Callable, Dict, Iterable, List, Sequence, Set, Tuple, Union, cast
+)
+
 import os.path
 import re
 import sys
@@ -17,10 +21,6 @@ from mutagen.easymp4 import EasyMP4Tags
 from rganalysis.common import logger, format_gain, format_peak, parse_gain, parse_peak
 from rganalysis.backends import GainComputer
 from rganalysis.fixup_id3 import fixup_ID3
-
-from typing import (
-    Any, Callable, Dict, Iterable, List, Sequence, Set, Tuple, Union, cast
-)
 
 rg_tags = (
     'replaygain_track_gain',
@@ -51,7 +51,7 @@ def Property(function: Callable) -> Callable:
     function()
     return property(**func_locals) # type: ignore
 
-def get_multi(d: dict[Any, Any], keys: Iterable[Any], default: Any = None) -> Any:
+def get_multi(d: Dict[Any, Any], keys: Iterable[Any], default: Any = None) -> Any:
     '''Like "dict.get", but keys is a list of keys to try.
 
     The value for the first key present will be returned, or default
@@ -303,11 +303,16 @@ class RGTrackSet(object):
         self.gain_backend = gain_backend
         self.gain_type = gain_type
 
+        self.filenames = sorted(self.RGTracks.keys())
+        self.num_tracks = len(self.RGTracks)
+        self.length_seconds = sum(t.length_seconds for t in self.RGTracks.values())
+        self.directory = next(iter(self.RGTracks.values())).directory
+
     def __repr__(self) -> str:
         return "RGTrackSet(%s, gain_type=%s)" % (repr(self.RGTracks.values()), repr(self.gain_type))
 
     @classmethod
-    def MakeTrackSets(cls: type, tracks: Iterable[RGTrack], gain_backend: GainComputer) -> Iterable[RGTrackSet]:
+    def MakeTrackSets(cls: type, tracks: Iterable[RGTrack], gain_backend: GainComputer) -> Iterable:
         '''Takes an iterable of RGTrack objects and returns an iterable of
         RGTrackSet objects, one for each track_set_key represented in
         the RGTrack objects.
@@ -389,31 +394,11 @@ class RGTrackSet(object):
             for t in self.RGTracks.values():
                 del t.album_peak
 
-    @Property
-    def filenames():            # type: ignore
-        def fget(self) -> List[str]:
-            return sorted(self.RGTracks.keys())
-
-    @Property
-    def num_tracks():           # type: ignore
-        def fget(self) -> int:
-            return len(self.RGTracks)
-
-    @Property
-    def length_seconds():       # type: ignore
-        def fget(self) -> float:
-            return sum(t.length_seconds for t in self.RGTracks.values())
-
     def track_set_key(self) -> Tuple:
         return next(iter(self.RGTracks.values())).track_set_key()
 
     def track_set_key_string(self) -> str:
         return next(iter(self.RGTracks.values())).track_set_key_string()
-
-    @Property
-    def directory():            # type: ignore
-        def fget(self) -> str:
-            return next(iter(self.RGTracks.values())).directory
 
     def _get_common_value_for_all_tracks(self, func: Callable) -> Any:
         '''Return the common value of running func on each track.
@@ -484,7 +469,7 @@ class RGTrackSet(object):
                 return
         else:
             logger.info('Analyzing track set %s', repr(self.track_set_key_string()))
-        rginfo = self.gain_backend.compute_gain(cast(List[str], self.filenames))
+        rginfo = self.gain_backend.compute_gain(cast(Sequence[str], self.filenames))
         # Save track gains
         for fname in self.RGTracks.keys():
             track = self.RGTracks[fname]

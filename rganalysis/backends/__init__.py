@@ -1,9 +1,9 @@
+from typing import List, Dict
+
 from abc import ABCMeta, abstractmethod
 from importlib import import_module
 
 from rganalysis.common import logger
-
-from typing import List
 
 class BackendUnavailableException(Exception):
     pass

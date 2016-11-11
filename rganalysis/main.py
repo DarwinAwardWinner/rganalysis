@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from typing import Sized
+
 import multiprocessing
 import plac
 import traceback
@@ -11,8 +13,6 @@ from multiprocessing.pool import ThreadPool
 from rganalysis import *
 from rganalysis.common import logger
 from rganalysis.backends import get_backend, known_backends, BackendUnavailableException
-
-from typing import Sized
 
 def tqdm_fake(iterable: Iterable, *args, **kwargs) -> Iterable:
     return iterable
@@ -51,7 +51,7 @@ class TrackSetHandler(PickleableMethodCaller):
             super(TrackSetHandler, self).__call__(track_set)
         except Exception:
             logger.error("Failed to analyze %s. Skipping this track set. The exception was:\n\n%s\n",
-                         track_set.track_set_key_string, traceback.format_exc())
+                         track_set.track_set_key_string(), traceback.format_exc())
         return track_set
 
 def positive_int(x: Any) -> int:
@@ -167,7 +167,7 @@ def main(force_reanalyze: bool = False,
             p.start()
             p.join()
             if p.exitcode != 0:  # type: ignore
-                logger.error("Subprocess exited with code %s for %s", p.exitcode, track_set.track_set_key_string)  # type: ignore
+                logger.error("Subprocess exited with code %s for %s", p.exitcode, track_set.track_set_key_string())  # type: ignore
         finally:
             if p.is_alive():
                 logger.debug("Killing subprocess")
