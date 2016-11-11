@@ -3,7 +3,7 @@ import sys
 import re
 
 from os import getenv
-from shutil import which
+from shutil import which # type: ignore
 from subprocess import Popen, PIPE, check_output, CalledProcessError
 from xml.sax.saxutils import quoteattr
 

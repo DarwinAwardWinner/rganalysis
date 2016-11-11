@@ -93,17 +93,17 @@ class RGTrack(object):
         return self.gain is not None and self.peak is not None
 
     @Property
-    def filename():
+    def filename(): # type: ignore
         def fget(self):
             return self.track.filename
 
     @Property
-    def directory():
+    def directory(): # type: ignore
         def fget(self):
             return os.path.dirname(self.filename)
 
     @Property
-    def track_set_key():
+    def track_set_key(): # type: ignore
         def fget(self):
             return (self.directory,
                     get_full_classname(self.track),
@@ -113,7 +113,7 @@ class RGTrack(object):
                     get_discnumber(self.track))
 
     @Property
-    def track_set_key_string():
+    def track_set_key_string(): # type: ignore
         '''A human-readable string representation of the track_set_key.
 
         Unlike the key itself, this is not guaranteed to uniquely
@@ -134,7 +134,7 @@ class RGTrack(object):
                 ftype=classname)
 
     @Property
-    def gain():
+    def gain(): # type: ignore
         doc = '''Track gain value, or None if the track does not have replaygain tags.
 
         Gain values are generally stored rounded to 2 decimal places,
@@ -159,7 +159,7 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
-    def peak():
+    def peak(): # type: ignore
         doc = '''Track peak dB, or None if the track does not have replaygain tags.
 
         Peak values are generally stored rounded to 6 decimal places,
@@ -187,7 +187,7 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
-    def album_gain():
+    def album_gain(): # type: ignore
         doc = '''Album gain value, or None if the album does not have replaygain tags.
 
         Gain values are generally stored rounded to 2 decimal places,
@@ -212,7 +212,7 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
-    def album_peak():
+    def album_peak(): # type: ignore
         doc = '''Album peak dB, or None if the album does not have replaygain tags.
 
         Peak values are generally stored rounded to 6 decimal places,
@@ -237,7 +237,7 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
-    def length_seconds():
+    def length_seconds(): # type: ignore
         def fget(self):
             return self.track.info.length
 
@@ -354,7 +354,7 @@ class RGTrackSet(object):
             return False
 
     @Property
-    def gain():
+    def gain(): # type: ignore
         doc = '''Album gain value, or None if tracks do not all agree on it.
 
         Gain values are generally stored rounded to 2 decimal places,
@@ -373,7 +373,7 @@ class RGTrackSet(object):
                 del t.album_gain
 
     @Property
-    def peak():
+    def peak(): # type: ignore
         doc = '''Album peak value, or None if tracks do not all agree on it.
 
         Peak values are generally stored rounded to 6 decimal places,
@@ -392,32 +392,32 @@ class RGTrackSet(object):
                 del t.album_peak
 
     @Property
-    def filenames():
+    def filenames(): # type: ignore
         def fget(self):
             return sorted(self.RGTracks.keys())
 
     @Property
-    def num_tracks():
+    def num_tracks(): # type: ignore
         def fget(self):
             return len(self.RGTracks)
 
     @Property
-    def length_seconds():
+    def length_seconds(): # type: ignore
         def fget(self):
             return sum(t.length_seconds for t in self.RGTracks.values())
 
     @Property
-    def track_set_key():
+    def track_set_key(): # type: ignore
         def fget(self):
             return next(iter(self.RGTracks.values())).track_set_key
 
     @Property
-    def track_set_key_string():
+    def track_set_key_string(): # type: ignore
         def fget(self):
             return next(iter(self.RGTracks.values())).track_set_key_string
 
     @Property
-    def directory():
+    def directory(): # type: ignore
         def fget(self):
             return next(iter(self.RGTracks.values())).directory
 
