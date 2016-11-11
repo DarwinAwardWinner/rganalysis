@@ -8,7 +8,7 @@ except ImportError as ex:
     raise BackendUnavailableException("Unable to use the audiotools backend: Could not load audiotools module. ")
 
 class AudiotoolsGainComputer(GainComputer):
-    def compute_gain(self, fnames, album=True):
+    def compute_gain(self, fnames: List[str], album: bool = True) -> Dict[str, Dict[str, float]]:
         audio_files = audiotools.open_files(fnames)
         if len(audio_files) != len(fnames):
             raise Exception("Could not load some files")
@@ -23,7 +23,7 @@ class AudiotoolsGainComputer(GainComputer):
             rginfo[rg[0].filename] = dict(zip(tag_order, rg[1:]))
         return rginfo
 
-    def supports_file(self, fname):
+    def supports_file(self, fname: str) -> bool:
         # Readable by audiotools?
         try:
             audiotools.open(fname)

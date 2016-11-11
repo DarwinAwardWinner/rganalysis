@@ -20,7 +20,7 @@ if not bs1770gain_path:
     raise BackendUnavailableException("Unable to use the bs1770gain backend: could not find bs1770gain executable in $PATH. To use this backend, ensure bs1770gain is in your $PATH or set BS1770GAIN_PATH environment variable to the path of the bs1770gain executable.")
 
 class Bs1770gainGainComputer(GainComputer):
-    def compute_gain(self, fnames, album=True):
+    def compute_gain(self, fnames: List[str], album: bool = True) -> Dict[str, Dict[str, float]]:
         basenames_to_fnames = { os.path.basename(f): f for f in fnames }
         if len(basenames_to_fnames) != len(fnames):
             raise ValueError("The bs1770gain backend cannot handle multiple files with the same basename.")
@@ -32,15 +32,15 @@ class Bs1770gainGainComputer(GainComputer):
             raise CalledProcessError(p.returncode, p.args) # type: ignore
         # https://github.com/python/typeshed/issues/525
         tree = etree.fromstring(xml_text).xpath(".")[0] # type: ignore
-        album = tree.xpath("/bs1770gain/album/summary")[0]
-        album_gain = float(album.xpath("./integrated/@lu")[0])
-        album_peak = float(album.xpath("./sample-peak/@factor")[0])
+        ainfo = tree.xpath("/bs1770gain/album/summary")[0]
+        album_gain = float(ainfo.xpath("./integrated/@lu")[0])
+        album_peak = float(ainfo.xpath("./sample-peak/@factor")[0])
         tracks = tree.xpath("/bs1770gain/album/track")
         rginfo = {}
-        for track in tracks:
-            track_name = track.xpath("./@file")[0]
-            track_gain = float(track.xpath("./integrated/@lu")[0])
-            track_peak = float(track.xpath("./sample-peak/@factor")[0])
+        for tinfo in tracks:
+            track_name = tinfo.xpath("./@file")[0]
+            track_gain = float(tinfo.xpath("./integrated/@lu")[0])
+            track_peak = float(tinfo.xpath("./sample-peak/@factor")[0])
             rginfo[basenames_to_fnames[track_name]] = {
                 "replaygain_track_gain": track_gain,
                 "replaygain_track_peak": track_peak,
@@ -49,7 +49,7 @@ class Bs1770gainGainComputer(GainComputer):
             }
         return rginfo
 
-    def supports_file(self, fname):
+    def supports_file(self, fname: str) -> bool:
         enc = sys.getdefaultencoding()
         p = Popen([bs1770gain_path, '-l', fname],
                   stderr=PIPE, stdout=PIPE)

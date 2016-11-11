@@ -14,10 +14,10 @@ from rganalysis.backends import get_backend, known_backends, BackendUnavailableE
 
 from typing import Sized
 
-def tqdm_fake(iterable, *args, **kwargs):
+def tqdm_fake(iterable: Iterable, *args, **kwargs) -> Iterable:
     return iterable
 
-def default_job_count():
+def default_job_count() -> int:
     try:
         return multiprocessing.cpu_count()
     except Exception:
@@ -25,11 +25,11 @@ def default_job_count():
 
 class PickleableMethodCaller(object):
     '''Pickleable method caller for multiprocessing.Pool.imap'''
-    def __init__(self, method_name, *args, **kwargs):
+    def __init__(self, method_name: str, *args , **kwargs) -> None:
         self.method_name = method_name
         self.args = args
         self.kwargs = kwargs
-    def __call__(self, obj):
+    def __call__(self, obj: Any) -> Any:
         try:
             return getattr(obj, self.method_name)(*self.args, **self.kwargs)
         except KeyboardInterrupt:
@@ -37,7 +37,8 @@ class PickleableMethodCaller(object):
 
 class TrackSetHandler(PickleableMethodCaller):
     '''Pickleable callable for multiprocessing.Pool.imap'''
-    def __init__(self, force=False, gain_type="auto", dry_run=False, verbose=False):
+    def __init__(self, force: bool = False, gain_type: str = "auto",
+                 dry_run: bool = False, verbose: bool = False) -> None:
         super(TrackSetHandler, self).__init__(
             "do_gain",
             force = force,
@@ -45,7 +46,7 @@ class TrackSetHandler(PickleableMethodCaller):
             verbose = verbose,
             dry_run = dry_run,
         )
-    def __call__(self, track_set):
+    def __call__(self, track_set: RGTrackSet) -> RGTrackSet:
         try:
             super(TrackSetHandler, self).__call__(track_set)
         except Exception:
@@ -53,7 +54,7 @@ class TrackSetHandler(PickleableMethodCaller):
                          track_set.track_set_key_string, traceback.format_exc())
         return track_set
 
-def positive_int(x):
+def positive_int(x: Any) -> int:
     i = int(x)
     if i < 1:
         raise ValueError()
@@ -91,13 +92,16 @@ def positive_int(x):
         "Print debug messages that are probably only useful if something is going wrong.",
         "flag", "v"),
 )
-def main(force_reanalyze=False, include_hidden=False,
-         dry_run=False, gain_type='auto',
-         backend='auto',
-         jobs=default_job_count(),
-         low_memory=False,
-         quiet=False, verbose=False,
-         *music_dir
+def main(force_reanalyze: bool = False,
+         include_hidden: bool = False,
+         dry_run: bool = False,
+         gain_type: str = 'auto',
+         backend: str = 'auto',
+         jobs: int = default_job_count(),
+         low_memory: bool = False,
+         quiet: bool = False,
+         verbose: bool = False,
+         *music_dir: str
          ):
     '''Add replaygain tags to your music files.'''
 
@@ -135,7 +139,6 @@ def main(force_reanalyze=False, include_hidden=False,
     if len(music_dir) == 0:
         logger.error("You did not specify any music directories or files. Exiting.")
         sys.exit(1)
-
     music_directories = list(unique(map(fullpath, music_dir)))
     logger.info("Searching for music files in the following locations:\n%s", "\n".join(music_directories),)
     all_music_files = get_all_music_files(music_directories,

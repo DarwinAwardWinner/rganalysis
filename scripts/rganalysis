@@ -6,7 +6,7 @@ import sys
 from rganalysis.main import main
 from rganalysis.common import logger
 
-def plac_call_main():
+def plac_call_main() -> None:
     try:
         return plac.call(main)
     except KeyboardInterrupt:

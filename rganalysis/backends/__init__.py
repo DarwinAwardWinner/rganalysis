@@ -29,7 +29,7 @@ class GainComputer(metaclass=ABCMeta):
     '''
 
     @abstractmethod
-    def compute_gain(self, fnames: List[str], album: bool = True):
+    def compute_gain(self, fnames: List[str], album: bool = True) -> Dict[str, Dict[str, float]]:
         '''Compute gain for files.
 
         Should return a nested dict, where the outer keys are file
@@ -55,7 +55,7 @@ class GainComputer(metaclass=ABCMeta):
 
 backends = {}                   # type: Dict[str, GainComputer]
 
-def register_backend(name: str, obj: GainComputer):
+def register_backend(name: str, obj: GainComputer) -> None:
     '''Backends modules should call this to register a GainComputer object.'''
     if not isinstance(obj, GainComputer):
         raise TypeError("Backend must be a GainComputer instance.")
@@ -87,13 +87,13 @@ def get_backend(name: str) -> GainComputer:
 
 class NullGainComputer(GainComputer):
     '''The null gain computer supports no files.'''
-    def compute_gain(self, fnames, album=True):
+    def compute_gain(self, fnames: List[str], album: bool = True) -> Dict[str, Dict[str, float]]:
         if len(fnames) == 0:
             return {}
         else:
             raise Exception("Unimplemented")
 
-    def supports_file(self, fname):
+    def supports_file(self, fname: str) -> bool:
         return False
 
 register_backend('null', NullGainComputer())

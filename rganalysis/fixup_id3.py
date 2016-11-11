@@ -4,7 +4,9 @@ import mutagen.id3 as id3
 
 from rganalysis.common import format_gain, format_peak
 
-def fixup_ID3(track):
+from typing import Union, cast
+
+def fixup_ID3(fname: Union[str, MusicFileType]) -> None:
     '''Convert RVA2 tags to TXXX:replaygain_* tags.
 
     Argument should be an MusicFile (instance of mutagen.FileType) or
@@ -22,10 +24,8 @@ def fixup_ID3(track):
 
     '''
     # Make sure we have the non-easy variant.
-    if isinstance(track, MusicFileType):
-        fname = track.filename
-    else:
-        fname = track
+    if isinstance(fname, MusicFileType):
+        fname = fname.filename  # type: ignore
     track = MusicFile(fname, easy=False)
     # Only operate on ID3
     if not isinstance(track, id3.ID3FileType):
