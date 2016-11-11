@@ -29,8 +29,9 @@ class Bs1770gainGainComputer(GainComputer):
         p = Popen(cmd, stdout=PIPE)
         xml_text = p.communicate()[0].decode(sys.getdefaultencoding())
         if p.wait() != 0:
-            raise CalledProcessError(p.returncode, p.args)
-        tree = etree.fromstring(xml_text)
+            raise CalledProcessError(p.returncode, p.args) # type: ignore
+        # https://github.com/python/typeshed/issues/525
+        tree = etree.fromstring(xml_text).xpath(".")[0] # type: ignore
         album = tree.xpath("/bs1770gain/album/summary")[0]
         album_gain = float(album.xpath("./integrated/@lu")[0])
         album_peak = float(album.xpath("./sample-peak/@factor")[0])

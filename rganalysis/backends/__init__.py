@@ -86,7 +86,7 @@ def get_backend(name):
 class NullGainComputer(GainComputer):
     '''The null gain computer supports no files.'''
     def compute_gain(self, fnames, album=True):
-        if length(fnames) == 0:
+        if len(fnames) == 0:
             return {}
         else:
             raise Exception("Unimplemented")
