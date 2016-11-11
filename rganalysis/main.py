@@ -161,8 +161,7 @@ def main(force_reanalyze: bool = False,
     # Wrapper that runs the handler in a subprocess, allowing for
     # parallel operation
     def wrapped_handler(track_set: RGTrackSet) -> RGTrackSet:
-        # https://github.com/python/mypy/issues/797
-        p = Process(target=handler, args=(track_set,)) # type: ignore
+        p = Process(target=handler, args=(track_set,)) # type: ignore # https://github.com/python/mypy/issues/797
         try:
             p.start()
             p.join()
@@ -178,14 +177,12 @@ def main(force_reanalyze: bool = False,
     try:
         if jobs <= 1:
             # Sequential
-            # https://github.com/python/mypy/issues/797
-            handled_track_sets = map(handler, track_sets) # type: ignore
+            handled_track_sets = map(handler, track_sets) # type: ignore # https://github.com/python/mypy/issues/797
         else:
             # Parallel (Using process pool doesn't work, so instead we
             # use Process instance within each thread)
             pool = ThreadPool(jobs)
-            # https://github.com/python/typeshed/issues/683
-            handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets) # type: ignore
+            handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets) # type: ignore # https://github.com/python/typeshed/issues/683
         # Wait for completion
         iter_len = None if low_memory else len(cast(Sized, track_sets))
         for ts in tqdm(handled_track_sets, total=iter_len, desc="Analyzing"):

@@ -33,8 +33,8 @@ class Bs1770gainGainComputer(GainComputer):
         xml_text = p.communicate()[0].decode(sys.getdefaultencoding())
         if p.wait() != 0:
             raise CalledProcessError(p.returncode, p.args) # type: ignore
-        # https://github.com/python/typeshed/issues/525
-        tree = etree.fromstring(xml_text).xpath(".")[0] # type: ignore
+
+        tree = etree.fromstring(xml_text).xpath(".")[0] # type: ignore # https://github.com/python/typeshed/issues/525
         ainfo = tree.xpath("/bs1770gain/album/summary")[0]
         album_gain = float(ainfo.xpath("./integrated/@lu")[0])
         album_peak = float(ainfo.xpath("./sample-peak/@factor")[0])
