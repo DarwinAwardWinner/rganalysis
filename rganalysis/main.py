@@ -156,12 +156,13 @@ def main(force_reanalyze=False, include_hidden=False,
     # Wrapper that runs the handler in a subprocess, allowing for
     # parallel operation
     def wrapped_handler(track_set):
-        p = Process(target=handler, args=(track_set,))
+        # https://github.com/python/mypy/issues/797
+        p = Process(target=handler, args=(track_set,)) # type: ignore
         try:
             p.start()
             p.join()
-            if p.exitcode != 0:
-                logger.error("Subprocess exited with code %s for %s", p.exitcode, track_set.track_set_key_string)
+            if p.exitcode != 0:  # type: ignore
+                logger.error("Subprocess exited with code %s for %s", p.exitcode, track_set.track_set_key_string)  # type: ignore
         finally:
             if p.is_alive():
                 logger.debug("Killing subprocess")
@@ -172,12 +173,14 @@ def main(force_reanalyze=False, include_hidden=False,
     try:
         if jobs <= 1:
             # Sequential
-            handled_track_sets = map(handler, track_sets)
+            # https://github.com/python/mypy/issues/797
+            handled_track_sets = map(handler, track_sets) # type: ignore
         else:
             # Parallel (Using process pool doesn't work, so instead we
             # use Process instance within each thread)
             pool = ThreadPool(jobs)
-            handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets)
+            # https://github.com/python/typeshed/issues/683
+            handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets) # type: ignore
         # Wait for completion
         iter_len = None if low_memory else len(track_sets)
         for ts in tqdm(handled_track_sets, total=iter_len, desc="Analyzing"):
