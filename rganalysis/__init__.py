@@ -18,7 +18,9 @@ from rganalysis.common import logger, format_gain, format_peak, parse_gain, pars
 from rganalysis.backends import GainComputer
 from rganalysis.fixup_id3 import fixup_ID3
 
-from typing import Any, Dict, Iterable, List, Set, Tuple
+from typing import (
+    Any, Callable, Dict, Iterable, List, Sequence, Set, Tuple, Union, cast
+)
 
 rg_tags = (
     'replaygain_track_gain',
@@ -32,11 +34,11 @@ for tag in rg_tags:
     mp4_tagname = "----:com.apple.iTunes:" + tag
     EasyMP4Tags.RegisterFreeformKey(tag, mp4_tagname)
 
-def fullpath(f):
+def fullpath(f: str) -> str:
     '''os.path.realpath + expanduser'''
     return os.path.realpath(os.path.expanduser(f))
 
-def Property(function):
+def Property(function: Callable) -> Callable:
     keys = 'fget', 'fset', 'fdel'
     func_locals = {'doc':function.__doc__}
     def probe_func(frame, event, arg):
@@ -47,9 +49,9 @@ def Property(function):
         return probe_func
     sys.settrace(probe_func)
     function()
-    return property(**func_locals)
+    return property(**func_locals) # type: ignore
 
-def get_multi(d, keys, default=None):
+def get_multi(d: dict[Any, Any], keys: Iterable[Any], default: Any = None) -> Any:
     '''Like "dict.get", but keys is a list of keys to try.
 
     The value for the first key present will be returned, or default
@@ -64,15 +66,15 @@ def get_multi(d, keys, default=None):
     return default
 
 # Tag names copied from Quod Libet
-def get_album(mf):
+def get_album(mf: MusicFile) -> str:
     return get_multi(mf, ("albumsort", "album"), [''])[0]
-def get_albumartist(mf):
+def get_albumartist(mf: MusicFile) -> str:
     return get_multi(mf, ("albumartistsort", "albumartist", "artistsort", "artist"), [''])[0]
-def get_albumid(mf):
+def get_albumid(mf: MusicFile) -> str:
     return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [''])[0]
-def get_discnumber(mf):
+def get_discnumber(mf: MusicFile) -> str:
     return mf.get("discnumber", [''])[0]
-def get_full_classname(mf):
+def get_full_classname(mf: MusicFile) -> str:
     t = type(mf)
     return "{}.{}".format(t.__module__, t.__qualname__)
 
@@ -80,60 +82,57 @@ class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
     for replaygain information.'''
 
-    def __init__(self, track):
-        if isinstance(track, MusicFileType):
-            self.track = track
-        else:
-            self.track = MusicFile(track, easy=True)
+    def __init__(self, track: Union[MusicFileType, str]) -> None:
+        if not isinstance(track, MusicFileType):
+            track = MusicFile(track, easy=True)
+        self.track = track # type: MusicFileType
+        self.filename = self.track.filename
+        self.directory = os.path.dirname(self.filename)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "RGTrack(MusicFile({}, easy=True))".format(repr(self.filename))
 
-    def has_valid_rgdata(self):
+    def has_valid_rgdata(self) -> bool:
         '''Returns True if the track has valid replay gain tags. The
         tags are not checked for accuracy, only existence.'''
         return self.gain is not None and self.peak is not None
 
-    @Property
-    def filename():             # type: ignore
-        def fget(self):
-            return self.track.filename
 
-    @Property
-    def directory():            # type: ignore
-        def fget(self):
-            return os.path.dirname(self.filename)
+    def track_set_key(self) -> Tuple:
+        '''Return a tuple that uniquely identifies the track's "album".
 
-    @Property
-    def track_set_key():        # type: ignore
-        def fget(self):
-            return (self.directory,
-                    get_full_classname(self.track),
-                    get_album(self.track),
-                    get_albumartist(self.track),
-                    get_albumid(self.track),
-                    get_discnumber(self.track))
+        The tuple is (directory, filetype, album, album artist, album
+        ID, discnumber). This should uniquely identify a set of tracks
+        whose volume should be normalized together.
 
-    @Property
-    def track_set_key_string(): # type: ignore
+        '''
+        return (self.directory,
+                get_full_classname(self.track),
+                get_album(self.track),
+                get_albumartist(self.track),
+                get_albumid(self.track),
+                get_discnumber(self.track))
+
+    def track_set_key_string(self) -> str:
         '''A human-readable string representation of the track_set_key.
 
         Unlike the key itself, this is not guaranteed to uniquely
-        identify a track set.'''
-        def fget(self):
-            (dirname, classname, album, artist, albumid, disc) = self.track_set_key
-            classname = re.sub("^.*\\.(Easy)?", "", classname)
-            key_string = "{album}"
-            if disc:
-                key_string += " Disc {disc}"
-            if artist:
-                key_string += " by {artist}"
-            key_string += " in directory {dirname} of type {ftype}"
-            return key_string.format(
-                album=album or "[No album]",
-                disc=disc, artist=artist,
-                dirname=dirname,
-                ftype=classname)
+        identify a track set.
+
+        '''
+        (dirname, classname, album, artist, albumid, disc) = self.track_set_key()
+        classname = re.sub("^.*\\.(Easy)?", "", classname)
+        key_string = "{album}"
+        if disc:
+            key_string += " Disc {disc}"
+        if artist:
+            key_string += " by {artist}"
+        key_string += " in directory {dirname} of type {ftype}"
+        return key_string.format(
+            album=album or "[No album]",
+            disc=disc, artist=artist,
+            dirname=dirname,
+            ftype=classname)
 
     @Property
     def gain():                 # type: ignore
@@ -143,20 +142,20 @@ class RGTrack(object):
         so you should not expect to get exactly the same value out as
         you put in.'''
         tag = 'replaygain_track_gain'
-        def fget(self):
+        def fget(self) -> float:
             try:
                 tval = self.track[tag][0]
                 gain = parse_gain(tval)
                 return gain
             except (KeyError, ValueError):
                 return None
-        def fset(self, value):
+        def fset(self, value: float) -> None:
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             if value is None:
                 del self.gain
             else:
                 self.track[tag] = format_gain(value)
-        def fdel(self):
+        def fdel(self) -> None:
             if tag in self.track.keys():
                 del self.track[tag]
 
@@ -168,20 +167,20 @@ class RGTrack(object):
         so you should not expect to get exactly the same value out as
         you put in.'''
         tag = 'replaygain_track_peak'
-        def fget(self):
+        def fget(self) -> float:
             try:
                 tval = self.track[tag][0]
                 peak = parse_peak(tval)
                 return peak
             except (KeyError, ValueError):
                 return None
-        def fset(self, value):
+        def fset(self, value) -> None:
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             if value is None:
                 del self.peak
             else:
                 self.track[tag] = format_peak(value)
-        def fdel(self):
+        def fdel(self) -> None:
             if tag in self.track.keys():
                 del self.track[tag]
 
@@ -193,20 +192,20 @@ class RGTrack(object):
         so you should not expect to get exactly the same value out as
         you put in.'''
         tag = 'replaygain_album_gain'
-        def fget(self):
+        def fget(self) -> float:
             try:
                 tval = self.track[tag][0]
                 gain = parse_gain(tval)
                 return gain
             except (KeyError, ValueError):
                 return None
-        def fset(self, value):
+        def fset(self, value) -> None:
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             if value is None:
                 del self.album_gain
             else:
                 self.track[tag] = format_gain(value)
-        def fdel(self):
+        def fdel(self) -> None:
             if tag in self.track.keys():
                 del self.track[tag]
 
@@ -218,29 +217,29 @@ class RGTrack(object):
         so you should not expect to get exactly the same value out as
         you put in.'''
         tag = 'replaygain_album_peak'
-        def fget(self):
+        def fget(self) -> float:
             try:
                 tval = self.track[tag][0]
                 peak = parse_peak(tval)
                 return peak
             except (KeyError, ValueError):
                 return None
-        def fset(self, value):
+        def fset(self, value) -> None:
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             if value is None:
                 del self.album_peak
             else:
                 self.track[tag] = format_peak(value)
-        def fdel(self):
+        def fdel(self) -> None:
             if tag in self.track.keys():
                 del self.track[tag]
 
     @Property
     def length_seconds():       # type: ignore
-        def fget(self):
+        def fget(self) -> float:
             return self.track.info.length
 
-    def cleanup_tags(self):
+    def cleanup_tags(self) -> None:
         '''Delete any ReplayGain tags from track.
 
         This dicards any unsaved changes, then modifies and saves the
@@ -265,15 +264,14 @@ class RGTrack(object):
         t.save()
         # Re-init to pick up tag changes
         new_track = type(self.track)(self.filename)
-        self.__init__(new_track)
+        self.track = new_track
 
-    def save(self, cleanup=True, fixup_id3=True):
+    def save(self, cleanup: bool = True, fixup_id3: bool = True) -> None:
         if cleanup:
             (tgain, tpeak, again, apeak) = \
                 (self.gain, self.peak, self.album_gain, self.album_peak)
             self.cleanup_tags()
-            (self.gain, self.peak, self.album_gain, self.album_peak) = \
-                (tgain, tpeak, again, apeak)
+            (self.gain, self.peak, self.album_gain, self.album_peak) = (tgain, tpeak, again, apeak) # type: ignore
         self.track.save()
         if fixup_id3:
             fixup_ID3(self.filename)
@@ -282,22 +280,22 @@ class RGTrackDryRun(RGTrack):
     '''Same as RGTrack, but file-modifying methods do nothing.
 
     This means that the file will never be modified.'''
-    def save(self):
+    def save(self, *args, **kwargs) -> None:
         pass
 
-    def cleanup_tags(self):
+    def cleanup_tags(self) -> None:
         pass
 
 class RGTrackSet(object):
     '''Represents and album and supplies methods to analyze the tracks in that album for replaygain information, as well as store that information in the tracks.'''
 
-    track_gain_signal_filenames = ('TRACKGAIN', '.TRACKGAIN', '_TRACKGAIN')
+    track_gain_signal_filenames = ('TRACKGAIN', '.TRACKGAIN', '_TRACKGAIN') # type: Sequence[str]
 
-    def __init__(self, tracks, gain_backend, gain_type="auto"):
+    def __init__(self, tracks: Iterable[RGTrack], gain_backend: GainComputer, gain_type: str = "auto") -> None:
         self.RGTracks = { str(t.filename): t for t in tracks }
         if len(self.RGTracks) < 1:
             raise ValueError("Track set must contain at least one track")
-        keys = set(t.track_set_key for t in self.RGTracks.values())
+        keys = set(t.track_set_key() for t in self.RGTracks.values())
         if (len(keys) != 1):
             raise ValueError("All tracks in an album must have the same key")
         if not isinstance(gain_backend, GainComputer):
@@ -305,11 +303,11 @@ class RGTrackSet(object):
         self.gain_backend = gain_backend
         self.gain_type = gain_type
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "RGTrackSet(%s, gain_type=%s)" % (repr(self.RGTracks.values()), repr(self.gain_type))
 
     @classmethod
-    def MakeTrackSets(cls, tracks, gain_backend):
+    def MakeTrackSets(cls: type, tracks: Iterable[RGTrack], gain_backend: GainComputer) -> Iterable[RGTrackSet]:
         '''Takes an iterable of RGTrack objects and returns an iterable of
         RGTrackSet objects, one for each track_set_key represented in
         the RGTrack objects.
@@ -324,18 +322,19 @@ class RGTrackSet(object):
         used to filter the tracks.
 
         '''
-        tracks = (t for t in tracks if gain_backend.supports_file(t.filename))
-        tracks_by_dir = groupby(tracks, lambda tr: os.path.dirname(tr.filename))
+        tracks = (tr for tr in tracks if gain_backend.supports_file(cast(str, tr.filename)))
+        tracks_by_dir = groupby(tracks, lambda tr: os.path.dirname(cast(str, tr.filename)))
         for (dirname, tracks_in_dir) in tracks_by_dir:
-            track_sets = {}     # type: Dict[Tuple, List]
-            for t in tracks_in_dir:
+            track_sets = {}     # type: Dict[Tuple, List[RGTrack]]
+            for tr in tracks_in_dir:
+                tskey = tr.track_set_key() # type: Tuple
                 try:
-                    track_sets[t.track_set_key].append(t)
+                    track_sets[tskey].append(tr)
                 except KeyError:
-                    track_sets[t.track_set_key] = [ t, ]
+                    track_sets[tskey] = [ tr, ]
             yield from ( cls(track_sets[k], gain_backend=gain_backend) for k in sorted(track_sets.keys()) )
 
-    def want_album_gain(self):
+    def want_album_gain(self) -> bool:
         '''Return true if this track set should have album gain tags,
         or false if not.'''
         if self.is_multitrack_album():
@@ -345,7 +344,7 @@ class RGTrackSet(object):
                 return False
             elif self.gain_type == "auto":
                 # Check for track gain signal files
-                return not any(os.path.exists(os.path.join(self.directory, f)) for f in self.track_gain_signal_filenames)
+                return not any(os.path.exists(os.path.join(cast(str, self.directory), f)) for f in self.track_gain_signal_filenames)
             else:
                 raise TypeError('RGTrackSet.gain_type must be either "track", "album", or "auto"')
         else:
@@ -359,15 +358,15 @@ class RGTrackSet(object):
         Gain values are generally stored rounded to 2 decimal places,
         so you should not expect to get exactly the same value out as
         you put in.'''
-        def fget(self):
+        def fget(self) -> float:
             try:
                 return self._get_common_value_for_all_tracks(lambda t: t.album_gain)
             except (TypeError, ValueError, KeyError):
                 return None
-        def fset(self, value):
+        def fset(self, value: float) -> None:
             for t in self.RGTracks.values():
                 t.album_gain = value
-        def fdel(self):
+        def fdel(self) -> None:
             for t in self.RGTracks.values():
                 del t.album_gain
 
@@ -378,49 +377,45 @@ class RGTrackSet(object):
         Peak values are generally stored rounded to 6 decimal places,
         so you should not expect to get exactly the same value out as
         you put in.'''
-        def fget(self):
+        def fget(self) -> float:
             try:
                 return self._get_common_value_for_all_tracks(lambda t: t.album_peak)
             except (TypeError, ValueError, KeyError):
                 return None
-        def fset(self, value):
+        def fset(self, value: float) -> None:
             for t in self.RGTracks.values():
                 t.album_peak = value
-        def fdel(self):
+        def fdel(self) -> None:
             for t in self.RGTracks.values():
                 del t.album_peak
 
     @Property
     def filenames():            # type: ignore
-        def fget(self):
+        def fget(self) -> List[str]:
             return sorted(self.RGTracks.keys())
 
     @Property
     def num_tracks():           # type: ignore
-        def fget(self):
+        def fget(self) -> int:
             return len(self.RGTracks)
 
     @Property
     def length_seconds():       # type: ignore
-        def fget(self):
+        def fget(self) -> float:
             return sum(t.length_seconds for t in self.RGTracks.values())
 
-    @Property
-    def track_set_key():        # type: ignore
-        def fget(self):
-            return next(iter(self.RGTracks.values())).track_set_key
+    def track_set_key(self) -> Tuple:
+        return next(iter(self.RGTracks.values())).track_set_key()
 
-    @Property
-    def track_set_key_string(): # type: ignore
-        def fget(self):
-            return next(iter(self.RGTracks.values())).track_set_key_string
+    def track_set_key_string(self) -> str:
+        return next(iter(self.RGTracks.values())).track_set_key_string()
 
     @Property
     def directory():            # type: ignore
-        def fget(self):
+        def fget(self) -> str:
             return next(iter(self.RGTracks.values())).directory
 
-    def _get_common_value_for_all_tracks(self, func):
+    def _get_common_value_for_all_tracks(self, func: Callable) -> Any:
         '''Return the common value of running func on each track.
 
         If the function returns different values for different tracks,
@@ -433,7 +428,7 @@ class RGTrackSet(object):
             raise ValueError("Function did not return the same value for all tracks.")
         return values.pop()
 
-    def _get_tag(self, tag):
+    def _get_tag(self, tag: str) -> Any:
         '''Get the value of a tag for the album.
 
         Only returns a tag's value if all tracks in the album have the
@@ -447,24 +442,25 @@ class RGTrackSet(object):
             return self._get_common_value_for_all_tracks(lambda t: t[tag])
         # More informative error message
         except ValueError:
-            tag_values = { t[tag] for t in self.RGTracks }
+            tag_values = { t[tag] for t in self.RGTracks } # type: ignore
             raise ValueError("Tracks have different values for {!r} tag: {!r}".format(tag, tag_values))
 
-    def _set_tag(self, tag, value):
+    def _set_tag(self, tag: str, value: Any) -> None:
         '''Set tag to value in all tracks in the album.'''
-        logger.debug("Setting %s to %s in all tracks in %s.", tag, value, self.track_set_key_string)
+        logger.debug("Setting %s to %s in all tracks in %s.", tag, value, self.track_set_key_string())
         for t in self.RGTracks.values():
             t.track[tag] = str(value)
 
-    def _del_tag(self, tag):
+    def _del_tag(self, tag: str) -> None:
         '''Delete tag from all tracks in the album.'''
-        logger.debug("Deleting %s in all tracks in %s.", tag, self.track_set_key_string)
+        logger.debug("Deleting %s in all tracks in %s.", tag, self.track_set_key_string())
         for t in self.RGTracks.values():
             try:
                 del t.track[tag]
             except KeyError: pass
 
-    def do_gain(self, force=False, gain_type=None, dry_run=False, verbose=False):
+    def do_gain(self, force: bool = False, gain_type: Union[None, str] = None,
+                dry_run: bool = False, verbose: bool = False) -> None:
         '''Analyze all tracks in the album, and add replay gain tags
         to the tracks based on the analysis.
 
@@ -482,31 +478,29 @@ class RGTrackSet(object):
         assert gain_type in ("album", "track")
         if self.has_valid_rgdata():
             if force:
-                logger.info("Forcing reanalysis of previously-analyzed track set %s", repr(self.track_set_key_string))
+                logger.info("Forcing reanalysis of previously-analyzed track set %s", repr(self.track_set_key_string()))
             else:
-                logger.info("Skipping previously-analyzed track set %s", repr(self.track_set_key_string))
+                logger.info("Skipping previously-analyzed track set %s", repr(self.track_set_key_string()))
                 return
         else:
-            logger.info('Analyzing track set %s', repr(self.track_set_key_string))
-        rginfo = self.gain_backend.compute_gain(self.filenames)
+            logger.info('Analyzing track set %s', repr(self.track_set_key_string()))
+        rginfo = self.gain_backend.compute_gain(cast(List[str], self.filenames))
         # Save track gains
         for fname in self.RGTracks.keys():
             track = self.RGTracks[fname]
             track_rginfo = rginfo[fname]
-            (track.gain, track.peak) = (track_rginfo["replaygain_track_gain"],
-                                        track_rginfo["replaygain_track_peak"])
+            (track.gain, track.peak) = (track_rginfo["replaygain_track_gain"], track_rginfo["replaygain_track_peak"]) # type: ignore
         # Set or unset album gain
         if gain_type == "album":
             album_rginfo = next(iter(rginfo.values()))
-            (self.gain, self.peak) = (track_rginfo["replaygain_album_gain"],
-                                      track_rginfo["replaygain_album_peak"])
+            (self.gain, self.peak) = (track_rginfo["replaygain_album_gain"], track_rginfo["replaygain_album_peak"]) # type: ignore
         else:
             del self.gain
             del self.peak
         # Now save the tags to the files
         self.save()
 
-    def is_multitrack_album(self):
+    def is_multitrack_album(self) -> bool:
         '''Returns True if this track set represents at least two
         songs, all from the same album. This will always be true
         unless except when one of the following holds:
@@ -514,12 +508,12 @@ class RGTrackSet(object):
         - the album consists of only one track;
         - the album is actually a collection of tracks that do not
           belong to any album.'''
-        if len(self.RGTracks) <= 1 or self.track_set_key[0:1] is ('',''):
+        if len(self.RGTracks) <= 1 or self.track_set_key()[0:1] is ('',''):
             return False
         else:
             return True
 
-    def has_valid_rgdata(self):
+    def has_valid_rgdata(self) -> bool:
         '''Returns true if the album's replay gain data appears valid.
         This means that all tracks have replay gain data, and all
         tracks have the *same* album gain data (it want_album_gain is True).
@@ -539,28 +533,28 @@ class RGTrackSet(object):
         else:
             return self.gain is None and self.peak is None
 
-    def report(self):
+    def report(self) -> None:
         '''Report calculated replay gain tags.'''
-        for k in sorted(self.filenames):
+        for k in sorted(cast(List[str], self.filenames)):
             track = self.RGTracks[k]
             logger.info("Set track gain tags for %s:\n\tTrack Gain: %s\n\tTrack Peak: %s", track.filename, track.gain, track.peak)
         if self.want_album_gain():
-            logger.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string, self.gain, self.peak)
+            logger.info("Set album gain tags for %s:\n\tAlbum Gain: %s\n\tAlbum Peak: %s", self.track_set_key_string(), self.gain, self.peak)
         else:
-            logger.info("Did not set album gain tags for %s.", self.track_set_key_string)
+            logger.info("Did not set album gain tags for %s.", self.track_set_key_string())
 
-    def save(self):
+    def save(self) -> None:
         '''Save the calculated replaygain tags'''
         self.report()
-        for k in self.filenames:
+        for k in cast(List[str], self.filenames):
             track = self.RGTracks[k]
             track.save()
 
-def remove_hidden_paths(paths):
+def remove_hidden_paths(paths: Iterable[str]) -> Iterable[str]:
     '''Filter out UNIX-style hidden paths from an iterable.'''
     return ( p for p in paths if not re.search('^\.',p) )
 
-def unique(items, key = None):
+def unique(items: Iterable, key = None) -> Iterable:
     '''Return an iterator over unique items, where two items are
     considered non-unique if "key(item)" returns the same value for
     both of them.
@@ -582,7 +576,7 @@ def unique(items, key = None):
             yield x
             seen.add(k)
 
-def is_subpath(path, directory):
+def is_subpath(path: str, directory: str) -> bool:
     '''Returns True of path is inside directory.
 
     Note that a path is considered to be inside itself.
@@ -595,7 +589,7 @@ def is_subpath(path, directory):
                 relative.startswith(os.pardir + os.sep) or
                 relative == os.curdir)
 
-def remove_redundant_paths(paths):
+def remove_redundant_paths(paths: Iterable[str]) -> Iterable[str]:
     '''Filter out any paths that are subpaths of other paths.
 
     Paths should be normalized before passing to this function.
@@ -610,7 +604,7 @@ def remove_redundant_paths(paths):
             yield p
             seen_paths.add(p)
 
-def is_music_file(file):
+def is_music_file(file: str) -> bool:
     # Exists?
     if not os.path.exists(file):
         logger.debug("File %s does not exist", repr(file))
@@ -629,7 +623,7 @@ def is_music_file(file):
     # OK!
     return True
 
-def get_all_music_files (paths, ignore_hidden=True):
+def get_all_music_files (paths: Iterable[str], ignore_hidden: bool = True) -> Iterable[MusicFileType]:
     '''Recursively search in one or more paths for music files.
 
     By default, hidden files and directories are ignored.

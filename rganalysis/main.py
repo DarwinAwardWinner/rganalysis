@@ -12,6 +12,8 @@ from rganalysis import *
 from rganalysis.common import logger
 from rganalysis.backends import get_backend, known_backends, BackendUnavailableException
 
+from typing import Sized
+
 def tqdm_fake(iterable, *args, **kwargs):
     return iterable
 
@@ -182,7 +184,7 @@ def main(force_reanalyze=False, include_hidden=False,
             # https://github.com/python/typeshed/issues/683
             handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets) # type: ignore
         # Wait for completion
-        iter_len = None if low_memory else len(track_sets)
+        iter_len = None if low_memory else len(cast(Sized, track_sets))
         for ts in tqdm(handled_track_sets, total=iter_len, desc="Analyzing"):
             pass
         logger.info("Analysis complete.")

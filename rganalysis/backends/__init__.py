@@ -3,6 +3,8 @@ from importlib import import_module
 
 from rganalysis.common import logger
 
+from typing import List
+
 class BackendUnavailableException(Exception):
     pass
 
@@ -27,7 +29,7 @@ class GainComputer(metaclass=ABCMeta):
     '''
 
     @abstractmethod
-    def compute_gain(self, fnames, album=True):
+    def compute_gain(self, fnames: List[str], album: bool = True):
         '''Compute gain for files.
 
         Should return a nested dict, where the outer keys are file
@@ -48,19 +50,19 @@ class GainComputer(metaclass=ABCMeta):
         '''
         raise NotImplementedError("This method should be overridden in a subclass")
 
-    def supports_file(self, fname):
+    def supports_file(self, fname: str) -> bool:
         raise NotImplementedError("This method should be overridden in a subclass")
 
-backends = {}
+backends = {}                   # type: Dict[str, GainComputer]
 
-def register_backend(name, obj):
+def register_backend(name: str, obj: GainComputer):
     '''Backends modules should call this to register a GainComputer object.'''
     if not isinstance(obj, GainComputer):
         raise TypeError("Backend must be a GainComputer instance.")
     logger.debug("Registering backend %s: %s", name, repr(obj))
     backends[name] = obj
 
-def get_backend(name):
+def get_backend(name: str) -> GainComputer:
     '''Return the GainComputer instance for NAME.
 
     If NAME is not registered as a backend, raises BackendUnavailableException.
