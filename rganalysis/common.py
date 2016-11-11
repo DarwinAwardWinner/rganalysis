@@ -13,13 +13,13 @@ logger.addHandler(logging.StreamHandler())
 for handler in logger.handlers:
     handler.setFormatter(logFormatter)
 
-def format_gain(gain):
+def format_gain(gain: float) -> str:
     return '{:.2f} dB'.format(gain)
 
-def format_peak(peak):
+def format_peak(peak: float) -> str:
     return '{:.6f}'.format(peak)
 
-def parse_gain(gain):
+def parse_gain(gain: str) -> float:
     try:
         return float(gain)
     except ValueError:
@@ -29,5 +29,5 @@ def parse_gain(gain):
         else:
             raise ValueError("Could not parse gain value: {gain}".format(gain=repr(gain)))
 
-def parse_peak(peak):
+def parse_peak(peak: str) -> float:
     return float(peak)
