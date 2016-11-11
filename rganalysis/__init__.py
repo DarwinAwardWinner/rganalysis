@@ -18,6 +18,8 @@ from rganalysis.common import logger, format_gain, format_peak, parse_gain, pars
 from rganalysis.backends import GainComputer
 from rganalysis.fixup_id3 import fixup_ID3
 
+from typing import Any, Dict, Iterable, List, Set, Tuple
+
 rg_tags = (
     'replaygain_track_gain',
     'replaygain_track_peak',
@@ -93,17 +95,17 @@ class RGTrack(object):
         return self.gain is not None and self.peak is not None
 
     @Property
-    def filename(): # type: ignore
+    def filename():             # type: ignore
         def fget(self):
             return self.track.filename
 
     @Property
-    def directory(): # type: ignore
+    def directory():            # type: ignore
         def fget(self):
             return os.path.dirname(self.filename)
 
     @Property
-    def track_set_key(): # type: ignore
+    def track_set_key():        # type: ignore
         def fget(self):
             return (self.directory,
                     get_full_classname(self.track),
@@ -134,7 +136,7 @@ class RGTrack(object):
                 ftype=classname)
 
     @Property
-    def gain(): # type: ignore
+    def gain():                 # type: ignore
         doc = '''Track gain value, or None if the track does not have replaygain tags.
 
         Gain values are generally stored rounded to 2 decimal places,
@@ -159,7 +161,7 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
-    def peak(): # type: ignore
+    def peak():                 # type: ignore
         doc = '''Track peak dB, or None if the track does not have replaygain tags.
 
         Peak values are generally stored rounded to 6 decimal places,
@@ -172,9 +174,6 @@ class RGTrack(object):
                 peak = parse_peak(tval)
                 return peak
             except (KeyError, ValueError):
-                if p:
-                    return p.named['value']
-            except KeyError:
                 return None
         def fset(self, value):
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
@@ -187,7 +186,7 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
-    def album_gain(): # type: ignore
+    def album_gain():           # type: ignore
         doc = '''Album gain value, or None if the album does not have replaygain tags.
 
         Gain values are generally stored rounded to 2 decimal places,
@@ -212,7 +211,7 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
-    def album_peak(): # type: ignore
+    def album_peak():           # type: ignore
         doc = '''Album peak dB, or None if the album does not have replaygain tags.
 
         Peak values are generally stored rounded to 6 decimal places,
@@ -237,7 +236,7 @@ class RGTrack(object):
                 del self.track[tag]
 
     @Property
-    def length_seconds(): # type: ignore
+    def length_seconds():       # type: ignore
         def fget(self):
             return self.track.info.length
 
@@ -249,11 +248,11 @@ class RGTrack(object):
         disk.
 
         '''
-        tags_to_clean = list(rg_tags)
-        tags_to_clean.extend('QuodLibet::' + tag for tag in list(tags_to_clean))
-        tags_to_clean.extend('TXXX:' + tag for tag in list(tags_to_clean))
-        tags_to_clean.extend(['RVA2:track', 'RVA2:album'])
-        tags_to_clean = set( tag.lower() for tag in list(tags_to_clean) )
+        tags_to_clean = set(rg_tags) # type: Set[str]
+        tags_to_clean.update('QuodLibet::' + tag for tag in rg_tags)
+        tags_to_clean.update('TXXX:' + tag for tag in rg_tags)
+        tags_to_clean.update(['RVA2:track', 'RVA2:album'])
+        tags_to_clean = { tag.lower() for tag in tags_to_clean }
         # Need a non-easy interface for proper ID3 cleanup
         t = MusicFile(self.filename, easy=False)
         tags_to_delete = []
@@ -328,7 +327,7 @@ class RGTrackSet(object):
         tracks = (t for t in tracks if gain_backend.supports_file(t.filename))
         tracks_by_dir = groupby(tracks, lambda tr: os.path.dirname(tr.filename))
         for (dirname, tracks_in_dir) in tracks_by_dir:
-            track_sets = {}
+            track_sets = {}     # type: Dict[Tuple, List]
             for t in tracks_in_dir:
                 try:
                     track_sets[t.track_set_key].append(t)
@@ -354,7 +353,7 @@ class RGTrackSet(object):
             return False
 
     @Property
-    def gain(): # type: ignore
+    def gain():                 # type: ignore
         doc = '''Album gain value, or None if tracks do not all agree on it.
 
         Gain values are generally stored rounded to 2 decimal places,
@@ -373,7 +372,7 @@ class RGTrackSet(object):
                 del t.album_gain
 
     @Property
-    def peak(): # type: ignore
+    def peak():                 # type: ignore
         doc = '''Album peak value, or None if tracks do not all agree on it.
 
         Peak values are generally stored rounded to 6 decimal places,
@@ -392,22 +391,22 @@ class RGTrackSet(object):
                 del t.album_peak
 
     @Property
-    def filenames(): # type: ignore
+    def filenames():            # type: ignore
         def fget(self):
             return sorted(self.RGTracks.keys())
 
     @Property
-    def num_tracks(): # type: ignore
+    def num_tracks():           # type: ignore
         def fget(self):
             return len(self.RGTracks)
 
     @Property
-    def length_seconds(): # type: ignore
+    def length_seconds():       # type: ignore
         def fget(self):
             return sum(t.length_seconds for t in self.RGTracks.values())
 
     @Property
-    def track_set_key(): # type: ignore
+    def track_set_key():        # type: ignore
         def fget(self):
             return next(iter(self.RGTracks.values())).track_set_key
 
@@ -417,7 +416,7 @@ class RGTrackSet(object):
             return next(iter(self.RGTracks.values())).track_set_key_string
 
     @Property
-    def directory(): # type: ignore
+    def directory():            # type: ignore
         def fget(self):
             return next(iter(self.RGTracks.values())).directory
 
@@ -448,6 +447,7 @@ class RGTrackSet(object):
             return self._get_common_value_for_all_tracks(lambda t: t[tag])
         # More informative error message
         except ValueError:
+            tag_values = { t[tag] for t in self.RGTracks }
             raise ValueError("Tracks have different values for {!r} tag: {!r}".format(tag, tag_values))
 
     def _set_tag(self, tag, value):
@@ -573,7 +573,7 @@ def unique(items, key = None):
     is proportional to the length of the input.
 
     '''
-    seen = set()
+    seen = set()                # type: Set[Any]
     for x in items:
         k = key(x) if key is not None else x
         if k in seen:
@@ -601,7 +601,7 @@ def remove_redundant_paths(paths):
     Paths should be normalized before passing to this function.
 
     '''
-    seen_paths = set()
+    seen_paths = set()          # type: Set[str]
     # Sorting ensures that parent directories appear before children
     for p in unique(sorted(paths)):
         if any(is_subpath(p, seen) for seen in seen_paths):
@@ -638,6 +638,7 @@ def get_all_music_files (paths, ignore_hidden=True):
     paths = map(fullpath, paths)
     for p in remove_redundant_paths(paths):
         if os.path.isdir(p):
+            files = []          # type: Iterable[str]
             for root, dirs, files in os.walk(p, followlinks=True):
                 logger.debug("Searching for music files in %s", repr(root))
                 if ignore_hidden:
