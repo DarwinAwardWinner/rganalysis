@@ -27,6 +27,7 @@ setup(
     extras_require = {
         'progress_bars':  ['tqdm'],
         'audiotools_backend': ['audiotools'],
+        'bs1770gain_backend': ['lxml'],
     },
     scripts=['scripts/rganalysis',],
 )
