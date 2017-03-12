@@ -31,8 +31,7 @@ rg_tags = (
 )
 for tag in rg_tags:
     # Support replaygain tags for M4A/MP4
-    mp4_tagname = "----:com.apple.iTunes:" + tag
-    EasyMP4Tags.RegisterFreeformKey(tag, mp4_tagname)
+    EasyMP4Tags.RegisterFreeformKey(tag, tag)
 
 def fullpath(f: str) -> str:
     '''os.path.realpath + expanduser'''
