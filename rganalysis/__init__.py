@@ -5,7 +5,7 @@
 # License as published by the Free Software Foundation.
 
 from typing import (
-    Any, Callable, Dict, Iterable, List, Sequence, Set, Tuple, Union, cast
+    Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
 )
 
 import os.path
@@ -67,8 +67,23 @@ def get_multi(d: Dict[Any, Any], keys: Iterable[Any], default: Any = None) -> An
 # Tag names copied from Quod Libet
 def get_album(mf: MusicFile) -> str:
     return get_multi(mf, ("albumsort", "album"), [''])[0]
+
+def get_compilation(mf: MusicFile) -> Optional[bool]:
+    '''Returns True, False, or None if the tag is absent or invalid.'''
+    try:
+        comp = mf['compilation'][0]
+        return bool(int(comp))
+    except Exception:
+        return None
+
 def get_albumartist(mf: MusicFile) -> str:
-    return get_multi(mf, ("albumartistsort", "albumartist", "artistsort", "artist"), [''])[0]
+    # First try album artist, then compilation tag if it's set to 1,
+    # then track artist.
+    return \
+        get_multi(mf, ("albumartistsort", "albumartist"), [''])[0] or \
+        ('[Compilation]' if get_compilation(mf) else None) or \
+        get_multi(mf, ("artistsort", "artist"), [''])[0]
+
 def get_albumid(mf: MusicFile) -> str:
     return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [''])[0]
 def get_discnumber(mf: MusicFile) -> str:
@@ -120,11 +135,14 @@ class RGTrack(object):
 
         '''
         (dirname, classname, album, artist, albumid, disc) = self.track_set_key()
+        comp = get_compilation(self.track)
         classname = re.sub("^.*\\.(Easy)?", "", classname)
         key_string = "{album}"
         if disc:
             key_string += " Disc {disc}"
-        if artist:
+        if artist == "[Compilation]":
+            key_string += " [Compilation]"
+        elif artist:
             key_string += " by {artist}"
         key_string += " in directory {dirname} of type {ftype}"
         return key_string.format(
