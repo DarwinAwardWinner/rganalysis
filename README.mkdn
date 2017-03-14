@@ -84,15 +84,25 @@ set" for the purposes of calculating audiophile gain if:
 * They are both the same music format (MP3, OGG, FLAC, etc.)
 * They have the same "album" tag (preferring the "albumsort" tag if
   present)
-* They have the same "albumartist" (preferring the "albumartistsort"
-  tag if present, and falling back to "artistsort" then "artist" if
-  there is no album artist tagged)
+* They have the same artist (see below)
 * They have the same "discnumber" tag (or lack thereof)
 
-This means if you have a multi-artist album, you'll need to set the
-"albumartist" tag to the same value (e.g. "Various Artists") on all
-songs in the album in order for all the songs to be grouped as a
-single album. You can still set a different "artist" tag on each song.
+For determining the artist, the following logic is used in order to
+ensure that albums with tracks by different artists are properly
+grouped together:
+
+1. If the "albumartistsort" or "albumartist" tag is set, that is used
+   as the artist.
+2. If the "compilation" tag is set to 1, then the placeholder value
+   "[Compilation]" is used as the artist
+3. If the "artistsort" or "artist" tag is set, that is used.
+
+This means if you have a multi-artist album and you want to have
+rganalysis compute a single album gain for the whole thing, you'll
+either need to set the "albumartist" tag to the same value (e.g.
+"Various Artists"), or you'll need to set the "compilation" tag to 1.
+Either way, you can still set a different "artist" tag on each song
+without disrupting the grouping.
 
 ## See also
 
