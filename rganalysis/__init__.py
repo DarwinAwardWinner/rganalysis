@@ -32,7 +32,9 @@ rg_tags = (
 for tag in rg_tags:
     # Support replaygain tags for M4A/MP4
     EasyMP4Tags.RegisterFreeformKey(tag, tag)
+# Support compilation tags for M4A/MP4
 EasyMP4Tags.RegisterTextKey("compilation", "cpil")
+EasyMP4Tags.RegisterFreeformKey("partofcompilation", "partofcompilation")
 
 def fullpath(f: str) -> str:
     '''os.path.realpath + expanduser'''
@@ -51,7 +53,7 @@ def Property(function: Callable) -> Callable:
     function()
     return property(**func_locals) # type: ignore
 
-def get_multi(d: Dict[Any, Any], keys: Iterable[Any], default: Any = None) -> Any:
+def dict_get_multi(d: Dict[Any, Any], keys: Iterable[Any], default: Any = None) -> Any:
     '''Like "dict.get", but keys is a list of keys to try.
 
     The value for the first key present will be returned, or default
@@ -67,12 +69,12 @@ def get_multi(d: Dict[Any, Any], keys: Iterable[Any], default: Any = None) -> An
 
 # Tag names copied from Quod Libet
 def get_album(mf: MusicFile) -> str:
-    return get_multi(mf, ("albumsort", "album"), [''])[0]
+    return dict_get_multi(mf, ("albumsort", "album"), [''])[0]
 
 def get_compilation(mf: MusicFile) -> Optional[bool]:
     '''Returns True, False, or None if the tag is absent or invalid.'''
     try:
-        comp = mf['compilation']
+        comp = dict_get_multi(mf, ('compilation', 'partofcompilation'), None)
         # Value could either be single value or list
         try:
             comp = comp[0]
@@ -86,17 +88,20 @@ def get_albumartist(mf: MusicFile) -> str:
     # First try album artist, then compilation tag if it's set to 1,
     # then track artist.
     return \
-        get_multi(mf, ("albumartistsort", "albumartist"), [''])[0] or \
+        dict_get_multi(mf, ("albumartistsort", "albumartist"), [''])[0] or \
         ('[Compilation]' if get_compilation(mf) else None) or \
-        get_multi(mf, ("artistsort", "artist"), [''])[0]
+        dict_get_multi(mf, ("artistsort", "artist"), [''])[0]
 
 def get_albumid(mf: MusicFile) -> str:
-    return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [''])[0]
+    return dict_get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [''])[0]
 def get_discnumber(mf: MusicFile) -> str:
     return mf.get("discnumber", [''])[0]
-def get_full_classname(mf: MusicFile) -> str:
+def get_full_classname(mf: MusicFile, include_easy: bool = False) -> str:
     t = type(mf)
-    return "{}.{}".format(t.__module__, t.__qualname__)
+    tstr = "{}.{}".format(t.__module__, t.__qualname__)
+    if not include_easy:
+        tstr = re.sub("^.*\\.(Easy)?", "", tstr)
+    return tstr
 
 class RGTrack(object):
     '''Represents a single track along with methods for analyzing it
@@ -117,45 +122,64 @@ class RGTrack(object):
         tags are not checked for accuracy, only existence.'''
         return self.gain is not None and self.peak is not None
 
+    def track_set_key_dict(self) -> Dict[str,Any]:
+        '''Return a dict of all album-identifying tags.
 
-    def track_set_key(self) -> Tuple:
-        '''Return a tuple that uniquely identifies the track's "album".
-
-        The tuple is (directory, filetype, album, album artist, album
-        ID, discnumber). This should uniquely identify a set of tracks
-        whose volume should be normalized together.
+        Returns a dict with keys 'album', 'albumid', 'artist',
+        'directory', 'discnumber', and 'filetype'.
 
         '''
-        return (self.directory,
-                get_full_classname(self.track),
-                get_album(self.track),
-                get_albumartist(self.track),
-                get_albumid(self.track),
-                get_discnumber(self.track))
+        return {
+            'album': get_album(self.track),
+            'albumid': get_albumid(self.track),
+            'artist': get_albumartist(self.track),
+            'directory': self.directory,
+            'discnumber': get_discnumber(self.track),
+            'filetype': get_full_classname(self.track),
+        }
 
-    def track_set_key_string(self) -> str:
-        '''A human-readable string representation of the track_set_key.
+    def track_set_key(self, key_pieces: Tuple[str, ...]=('directory', 'filetype', 'album', 'artist', 'albumid', 'discnumber')) -> Tuple:
+        '''Return a tuple that uniquely identifies the track's "album".
+
+        This tuple should be usable for uniquely identifying and
+        grouping a set of tracks whose album gain should be computed
+        together.
+
+        The optional key_pieces argument allows customization of the
+        criteria for grouping an album. By default, all six available
+        criteria are used: 'album', 'albumid', 'artist', 'directory',
+        'discnumber', and 'filetype'.
+
+        '''
+        d = self.track_set_key_dict()
+        return tuple(d[k] for k in sorted(key_pieces))
+
+    def track_set_key_string(self, key_pieces: Tuple[str, ...]=('directory', 'filetype', 'album', 'artist', 'albumid', 'discnumber')) -> str:
+        '''A human-readable string representation of self.track_set_key().
 
         Unlike the key itself, this is not guaranteed to uniquely
         identify a track set.
 
         '''
-        (dirname, classname, album, artist, albumid, disc) = self.track_set_key()
+        d = self.track_set_key_dict()
         comp = get_compilation(self.track)
-        classname = re.sub("^.*\\.(Easy)?", "", classname)
-        key_string = "{album}"
-        if disc:
-            key_string += " Disc {disc}"
-        if artist == "[Compilation]":
-            key_string += " [Compilation]"
-        elif artist:
-            key_string += " by {artist}"
-        key_string += " in directory {dirname} of type {ftype}"
-        return key_string.format(
-            album=album or "[No album]",
-            disc=disc, artist=artist,
-            dirname=dirname,
-            ftype=classname)
+        key_string_pieces = []
+        if 'album' in key_pieces and d['album']:
+            key_string_pieces.append('{album}')
+        if 'discnumber' in key_pieces and d['discnumber']:
+            key_string_pieces.append('Disc {discnumber}')
+        if 'artist' in key_pieces and d['artist']:
+            if comp:
+                key_string_pieces.append('[Compilation]')
+            else:
+                key_string_pieces.append('by {artist}')
+        if 'directory' in key_pieces:
+            key_string_pieces.append('in directory {directory}')
+        if 'filetype' in key_pieces:
+            key_string_pieces.append('of type {filetype}')
+
+        key_string = ' '.join(key_string_pieces).format(**d)
+        return key_string
 
     @Property
     def gain():                 # type: ignore
@@ -314,11 +338,13 @@ class RGTrackSet(object):
 
     track_gain_signal_filenames = ('TRACKGAIN', '.TRACKGAIN', '_TRACKGAIN') # type: Sequence[str]
 
-    def __init__(self, tracks: Iterable[RGTrack], gain_backend: GainComputer, gain_type: str = "auto") -> None:
+    def __init__(self, tracks: Iterable[RGTrack], gain_backend: GainComputer, gain_type: str = "auto",
+                 key_pieces: Tuple[str, ...]=('directory', 'filetype', 'album', 'artist', 'albumid', 'discnumber')) -> None:
+        self.key_pieces = tuple(sorted(key_pieces))
         self.RGTracks = { str(t.filename): t for t in tracks }
         if len(self.RGTracks) < 1:
             raise ValueError("Track set must contain at least one track")
-        keys = set(t.track_set_key() for t in self.RGTracks.values())
+        keys = set(t.track_set_key(key_pieces=self.key_pieces) for t in self.RGTracks.values())
         if (len(keys) != 1):
             raise ValueError("All tracks in an album must have the same key")
         if not isinstance(gain_backend, GainComputer):
@@ -335,32 +361,53 @@ class RGTrackSet(object):
         return "RGTrackSet(%s, gain_type=%s)" % (repr(self.RGTracks.values()), repr(self.gain_type))
 
     @classmethod
-    def MakeTrackSets(cls: type, tracks: Iterable[RGTrack], gain_backend: GainComputer) -> Iterable:
+    def MakeTrackSets(cls: type, tracks: Iterable[RGTrack], gain_backend: GainComputer,
+                      key_pieces: Tuple[str, ...]=('directory', 'filetype', 'album', 'artist', 'albumid', 'discnumber')) -> Iterable:
         '''Takes an iterable of RGTrack objects and returns an iterable of
         RGTrackSet objects, one for each track_set_key represented in
         the RGTrack objects.
 
         The input iterable need not be completely sorted, but tracks
         from the same directory should be yielded consecutively with
-        each other, or else they will not be grouped.
+        each other if 'directory' is one of the grouping criterion
+        (see 'key_pieces' argument below).
 
         Second argument 'backend' should be an instance of
         GainComputer that will be passed to the RGTrackSet
         constructor. In addition, its supports_file method will be
         used to filter the tracks.
 
+        The optional argument key_pieces is a tuple of metadata names
+        that should be used to group the tracks. Note that if this
+        argument does not contain 'directory', then the metadata for
+        all tracks must be loaded into memory at once, which may be
+        undesirable for large music collections.
+
         '''
         tracks = (tr for tr in tracks if gain_backend.supports_file(cast(str, tr.filename)))
-        tracks_by_dir = groupby(tracks, lambda tr: os.path.dirname(cast(str, tr.filename)))
-        for (dirname, tracks_in_dir) in tracks_by_dir:
-            track_sets = {}     # type: Dict[Tuple, List[RGTrack]]
-            for tr in tracks_in_dir:
-                tskey = tr.track_set_key() # type: Tuple
+        if 'directory' in key_pieces:
+            tracks_by_dir = groupby(tracks, lambda tr: os.path.dirname(cast(str, tr.filename)))
+            for (dirname, tracks_in_dir) in tracks_by_dir:
+                track_sets = {}     # type: Dict[Tuple, List[RGTrack]]
+                for tr in tracks_in_dir:
+                    tskey = tr.track_set_key(key_pieces=key_pieces)
+                    try:
+                        track_sets[tskey].append(tr)
+                    except KeyError:
+                        track_sets[tskey] = [ tr, ]
+                yield from ( cls(track_sets[k], gain_backend=gain_backend, key_pieces=key_pieces)
+                             for k in sorted(track_sets.keys()) )
+        else:
+            logger.debug('Loading all tracks into memory because "directory" is not in the grouping criteria.')
+            track_sets = {}
+            for tr in tracks:
+                tskey = tr.track_set_key(key_pieces=key_pieces)
                 try:
                     track_sets[tskey].append(tr)
                 except KeyError:
                     track_sets[tskey] = [ tr, ]
-            yield from ( cls(track_sets[k], gain_backend=gain_backend) for k in sorted(track_sets.keys()) )
+            yield from ( cls(track_sets[k], gain_backend=gain_backend, key_pieces=key_pieces)
+                         for k in sorted(track_sets.keys()) )
 
     def want_album_gain(self) -> bool:
         '''Return true if this track set should have album gain tags,
@@ -418,10 +465,10 @@ class RGTrackSet(object):
                 del t.album_peak
 
     def track_set_key(self) -> Tuple:
-        return next(iter(self.RGTracks.values())).track_set_key()
+        return next(iter(self.RGTracks.values())).track_set_key(key_pieces=self.key_pieces)
 
     def track_set_key_string(self) -> str:
-        return next(iter(self.RGTracks.values())).track_set_key_string()
+        return next(iter(self.RGTracks.values())).track_set_key_string(key_pieces=self.key_pieces)
 
     def _get_common_value_for_all_tracks(self, func: Callable) -> Any:
         '''Return the common value of running func on each track.

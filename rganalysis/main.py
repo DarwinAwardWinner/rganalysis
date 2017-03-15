@@ -72,8 +72,11 @@ def positive_int(x: Any) -> int:
     gain_type=(
         'Can be "album", "track", or "auto". If "track", only track gain values will be calculated, and album gain values will be erased. if "album", both track and album gain values will be calculated. If "auto", then "album" mode will be used except in directories that contain a file called "TRACKGAIN" or ".TRACKGAIN". In these directories, "track" mode will be used. The default setting is "auto".',
         "option", "g", str, ('album', 'track', 'auto'), '(track|album|auto)'),
+    key_pieces=(
+        'Comma-separated list of metadata used as part of the key for grouping tracks into albums. Note that the "--low-memory" option can only be used if "directory" is included in the grouping criteria. Examples: To treat compute a single albm gain value for all discs in a multi-disc album, omit "discnumber" from the grouping criteria. If some albums are split across multiple directoies, omit "directory" from the grouping criteria. (Note: no adjustment is necessary for multi-artist albums/compilations, as long as they have an "album artist" or "compilation" tag.)',
+        "option", "k", str, None, ''),
     backend=(
-        'Gain computing backend to use. Different backends have different prerequisites.',
+        'Backend to use for computing gain values. Different backends have different prerequisites and may support different file types.',
         "option", "b", str, None, '(audiotools|bs1770gain|auto)'),
     dry_run=("Don't modify any files. Only analyze and report gain.",
              "flag", "n"),
@@ -96,6 +99,7 @@ def main(force_reanalyze: bool = False,
          include_hidden: bool = False,
          dry_run: bool = False,
          gain_type: str = 'auto',
+         key_pieces: str = 'album,albumid,discnumber,artist,directory,filetype',
          backend: str = 'auto',
          jobs: int = default_job_count(),
          low_memory: bool = False,
@@ -132,6 +136,11 @@ def main(force_reanalyze: bool = False,
         gain_backend = get_backend(backend)
         logger.info("Using the %s backend to compute ReplayGain", backend)
 
+    key_piece_tuple = tuple( k.strip() for k in key_pieces.split(",") )
+    if low_memory and 'directory' not in key_piece_tuple:
+        logger.error('Cannot run in low-memory mode if "directory" is not included in --key-pieces.')
+        sys.exit(1)
+
     track_constructor = RGTrack
     if dry_run:
         logger.warn('This script is running in "dry run" mode, so no files will actually be modified.')
@@ -143,12 +152,13 @@ def main(force_reanalyze: bool = False,
     logger.info("Searching for music files in the following locations:\n%s", "\n".join(music_directories),)
     all_music_files = get_all_music_files(music_directories,
                                           ignore_hidden=(not include_hidden))
+    # TODO: If directory is not in key_types, sort all files by key
     if low_memory:
         tracks = map(track_constructor, all_music_files)
-        track_sets = RGTrackSet.MakeTrackSets(tracks, gain_backend=gain_backend)
+        track_sets = RGTrackSet.MakeTrackSets(tracks, gain_backend=gain_backend, key_pieces=key_piece_tuple)
     else:
         tracks = map(track_constructor, tqdm(all_music_files, desc="Searching"))
-        track_sets = list(RGTrackSet.MakeTrackSets(tracks, gain_backend=gain_backend))
+        track_sets = list(RGTrackSet.MakeTrackSets(tracks, gain_backend=gain_backend, key_pieces=key_piece_tuple))
         if len(track_sets) == 0:
             logger.error("Failed to find any tracks in the directories you specified. Exiting.")
             sys.exit(1)
