@@ -32,6 +32,7 @@ rg_tags = (
 for tag in rg_tags:
     # Support replaygain tags for M4A/MP4
     EasyMP4Tags.RegisterFreeformKey(tag, tag)
+EasyMP4Tags.RegisterTextKey("compilation", "cpil")
 
 def fullpath(f: str) -> str:
     '''os.path.realpath + expanduser'''
@@ -71,7 +72,12 @@ def get_album(mf: MusicFile) -> str:
 def get_compilation(mf: MusicFile) -> Optional[bool]:
     '''Returns True, False, or None if the tag is absent or invalid.'''
     try:
-        comp = mf['compilation'][0]
+        comp = mf['compilation']
+        # Value could either be single value or list
+        try:
+            comp = comp[0]
+        except TypeError:
+            pass
         return bool(int(comp))
     except Exception:
         return None
