@@ -102,4 +102,4 @@ class NullGainComputer(GainComputer):
 register_backend('null', NullGainComputer())
 
 # Used to select a backend for  '--backend=auto'
-known_backends = ('bs1770gain', 'audiotools')
+known_backends = ('audiotools', 'bs1770gain')

@@ -61,8 +61,7 @@ Lastly, you need to install the prerequisites for at least one
 backend. Right now there are 2 backends available for computing replay
 gain: one which uses the
 [audiotools](http://audiotools.sourceforge.net/) Python module, and
-one which uses the command-line program
-[bs1770gain](http://bs1770gain.sourceforge.net/). You'll need to
+one which uses the command-line program bs1770gain. You'll need to
 install either one or the other to use this script. (If you prefer
 another tool for computing replay gain, feel free to let me know about
 it, and I will see if I can write a backend for it.)
