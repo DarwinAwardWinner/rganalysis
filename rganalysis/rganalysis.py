@@ -3,8 +3,8 @@
 import plac
 import sys
 
-from rganalysis.main import main
-from rganalysis.common import logger
+from .main import main
+from .common import logger
 
 def plac_call_main() -> None:
     try:

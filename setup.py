@@ -31,7 +31,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'rganalysis=rganalysis.main:main',
+            'rganalysis=rganalysis.rganalysis:main',
         ]
     },
 )
