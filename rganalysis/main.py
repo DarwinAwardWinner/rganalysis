@@ -127,7 +127,7 @@ def main(force_reanalyze: bool = False,
             except BackendUnavailableException:
                 pass
         else:
-            raise BackendUnavailableException("Could not find any usable backends.")
+            raise BackendUnavailableException("Could not find any usable backends. Perhaps you have not installed the prerequisites?")
     else:
         gain_backend = get_backend(backend)
         logger.info("Using the %s backend to compute ReplayGain", backend)
