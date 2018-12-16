@@ -29,5 +29,9 @@ setup(
         'audiotools_backend': ['audiotools'],
         'bs1770gain_backend': ['lxml'],
     },
-    scripts=['scripts/rganalysis',],
+    entry_points={
+        'console_scripts': [
+            'pigar=pigar.__main__:main',
+        ]
+    },
 )
