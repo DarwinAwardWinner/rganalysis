@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typing import Sized
+from typing import Sized, List, Iterable
 
 import multiprocessing
 import plac
@@ -101,7 +101,7 @@ def main(force_reanalyze: bool = False,
          low_memory: bool = False,
          quiet: bool = False,
          verbose: bool = False,
-         *music_dir: str
+         *music_dir: str,
          ):
     '''Add replaygain tags to your music files.'''
 
@@ -119,18 +119,26 @@ def main(force_reanalyze: bool = False,
         logger.setLevel(logging.INFO)
 
     if backend == 'auto':
+        backend_exceptions: List[BackendUnavailableException] = []
         for bname in known_backends:
             try:
                 gain_backend = get_backend(bname)
-                logger.info("Selected the %s backend to compute ReplayGain", bname)
+                logger.info('Selected the {} backend to compute ReplayGain'.format(bname))
                 break
-            except BackendUnavailableException:
-                pass
+            except BackendUnavailableException as ex:
+                backend_exceptions.append(ex)
         else:
-            raise BackendUnavailableException("Could not find any usable backends. Perhaps you have not installed the prerequisites?")
+            for ex in backend_exceptions:
+                logger.error(ex.args[0])
+            logger.error('Could not find any usable backends. Perhaps you have not installed the prerequisites?')
+            sys.exit(1)
     else:
-        gain_backend = get_backend(backend)
-        logger.info("Using the %s backend to compute ReplayGain", backend)
+        try:
+            gain_backend = get_backend(backend)
+            logger.info('Using the {} backend to compute ReplayGain'.format(backend))
+        except BackendUnavailableException as ex:
+            logger.error(ex.args[0])
+            sys.exit(1)
 
     track_constructor = RGTrack
     if dry_run:
