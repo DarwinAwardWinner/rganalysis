@@ -5,7 +5,7 @@
 # License as published by the Free Software Foundation.
 
 from typing import (
-    Any, Callable, Dict, Iterable, List, Sequence, Set, Tuple, Union, cast
+    Any, Callable, Dict, Iterable, List, Sequence, Set, Tuple, Union, cast, Optional,
 )
 
 import os.path
@@ -84,7 +84,7 @@ class RGTrack(object):
     def __init__(self, track: Union[MusicFileType, str]) -> None:
         if not isinstance(track, MusicFileType):
             track = MusicFile(track, easy=True)
-        self.track = track # type: MusicFileType
+        self.track: MusicFileType = track
         self.filename = self.track.filename
         self.directory = os.path.dirname(self.filename)
 
@@ -141,20 +141,20 @@ class RGTrack(object):
         so you should not expect to get exactly the same value out as
         you put in.'''
         tag = 'replaygain_track_gain'
-        def fget(self) -> float:
+        def fget(self: 'RGTrack') -> Optional[float]:
             try:
                 tval = self.track[tag][0]
                 gain = parse_gain(tval)
                 return gain
             except (KeyError, ValueError):
                 return None
-        def fset(self, value: float) -> None:
+        def fset(self: 'RGTrack', value: float) -> None:
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             if value is None:
                 del self.gain
             else:
                 self.track[tag] = format_gain(value)
-        def fdel(self) -> None:
+        def fdel(self: 'RGTrack') -> None:
             if tag in self.track.keys():
                 del self.track[tag]
 
@@ -166,20 +166,20 @@ class RGTrack(object):
         so you should not expect to get exactly the same value out as
         you put in.'''
         tag = 'replaygain_track_peak'
-        def fget(self) -> float:
+        def fget(self: 'RGTrack') -> Optional[float]:
             try:
                 tval = self.track[tag][0]
                 peak = parse_peak(tval)
                 return peak
             except (KeyError, ValueError):
                 return None
-        def fset(self, value) -> None:
+        def fset(self: 'RGTrack', value: float) -> None:
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             if value is None:
                 del self.peak
             else:
                 self.track[tag] = format_peak(value)
-        def fdel(self) -> None:
+        def fdel(self: 'RGTrack') -> None:
             if tag in self.track.keys():
                 del self.track[tag]
 
@@ -191,20 +191,20 @@ class RGTrack(object):
         so you should not expect to get exactly the same value out as
         you put in.'''
         tag = 'replaygain_album_gain'
-        def fget(self) -> float:
+        def fget(self: 'RGTrack') -> Optional[float]:
             try:
                 tval = self.track[tag][0]
                 gain = parse_gain(tval)
                 return gain
             except (KeyError, ValueError):
                 return None
-        def fset(self, value) -> None:
+        def fset(self: 'RGTrack', value: float) -> None:
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             if value is None:
                 del self.album_gain
             else:
                 self.track[tag] = format_gain(value)
-        def fdel(self) -> None:
+        def fdel(self: 'RGTrack') -> None:
             if tag in self.track.keys():
                 del self.track[tag]
 
@@ -216,26 +216,26 @@ class RGTrack(object):
         so you should not expect to get exactly the same value out as
         you put in.'''
         tag = 'replaygain_album_peak'
-        def fget(self) -> float:
+        def fget(self: 'RGTrack') -> Optional[float]:
             try:
                 tval = self.track[tag][0]
                 peak = parse_peak(tval)
                 return peak
             except (KeyError, ValueError):
                 return None
-        def fset(self, value) -> None:
+        def fset(self: 'RGTrack', value: float) -> None:
             logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
             if value is None:
                 del self.album_peak
             else:
                 self.track[tag] = format_peak(value)
-        def fdel(self) -> None:
+        def fdel(self: 'RGTrack') -> None:
             if tag in self.track.keys():
                 del self.track[tag]
 
     @Property
     def length_seconds():       # type: ignore
-        def fget(self) -> float:
+        def fget(self: 'RGTrack') -> float:
             return self.track.info.length
 
     def cleanup_tags(self) -> None:
@@ -279,7 +279,7 @@ class RGTrackDryRun(RGTrack):
     '''Same as RGTrack, but file-modifying methods do nothing.
 
     This means that the file will never be modified.'''
-    def save(self, *args, **kwargs) -> None:
+    def save(self, *args: Any, **kwargs: Any) -> None:
         pass
 
     def cleanup_tags(self) -> None:
@@ -362,15 +362,15 @@ class RGTrackSet(object):
         Gain values are generally stored rounded to 2 decimal places,
         so you should not expect to get exactly the same value out as
         you put in.'''
-        def fget(self) -> float:
+        def fget(self: 'RGTrackSet') -> Optional[float]:
             try:
                 return self._get_common_value_for_all_tracks(lambda t: t.album_gain)
             except (TypeError, ValueError, KeyError):
                 return None
-        def fset(self, value: float) -> None:
+        def fset(self: 'RGTrackSet', value: float) -> None:
             for t in self.RGTracks.values():
-                t.album_gain = value
-        def fdel(self) -> None:
+                t.album_gain = value # type:ignore
+        def fdel(self: 'RGTrackSet') -> None:
             for t in self.RGTracks.values():
                 del t.album_gain
 
@@ -381,15 +381,15 @@ class RGTrackSet(object):
         Peak values are generally stored rounded to 6 decimal places,
         so you should not expect to get exactly the same value out as
         you put in.'''
-        def fget(self) -> float:
+        def fget(self: 'RGTrackSet') -> Optional[float]:
             try:
                 return self._get_common_value_for_all_tracks(lambda t: t.album_peak)
             except (TypeError, ValueError, KeyError):
                 return None
-        def fset(self, value: float) -> None:
+        def fset(self: 'RGTrackSet', value: float) -> None:
             for t in self.RGTracks.values():
-                t.album_peak = value
-        def fdel(self) -> None:
+                t.album_peak = value # type:ignore
+        def fdel(self: 'RGTrackSet') -> None:
             for t in self.RGTracks.values():
                 del t.album_peak
 
@@ -538,7 +538,7 @@ def remove_hidden_paths(paths: Iterable[str]) -> Iterable[str]:
     '''Filter out UNIX-style hidden paths from an iterable.'''
     return ( p for p in paths if not re.search('^\.',p) )
 
-def unique(items: Iterable, key = None) -> Iterable:
+def unique(items: Iterable, key: Optional[Callable] = None) -> Iterable:
     '''Return an iterator over unique items, where two items are
     considered non-unique if "key(item)" returns the same value for
     both of them.

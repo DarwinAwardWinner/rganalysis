@@ -1,11 +1,11 @@
-from typing import Dict, Iterable
+from typing import Dict, Iterable, cast
 
 import os.path
 import sys
 import re
 
 from os import getenv
-from shutil import which # type: ignore
+from shutil import which
 from subprocess import Popen, PIPE, check_output, CalledProcessError
 from xml.sax.saxutils import quoteattr
 
@@ -17,7 +17,7 @@ try:
 except ImportError:
     raise BackendUnavailableException("Unable to use the bs1770gain backend: The lxml python module is not installed.")
 
-bs1770gain_path = getenv("BS1770GAIN_PATH") or which("bs1770gain")
+bs1770gain_path = cast(str, getenv("BS1770GAIN_PATH") or which("bs1770gain"))
 if not bs1770gain_path:
     raise BackendUnavailableException("Unable to use the bs1770gain backend: could not find bs1770gain executable in $PATH. To use this backend, ensure bs1770gain is in your $PATH or set BS1770GAIN_PATH environment variable to the path of the bs1770gain executable.")
 
@@ -32,9 +32,9 @@ class Bs1770gainGainComputer(GainComputer):
         p = Popen(cmd, stdout=PIPE)
         xml_text = p.communicate()[0].decode(sys.getdefaultencoding())
         if p.wait() != 0:
-            raise CalledProcessError(p.returncode, p.args) # type: ignore
+            raise CalledProcessError(p.returncode, p.args)
 
-        tree = etree.fromstring(xml_text).xpath(".")[0] # type: ignore # https://github.com/python/typeshed/issues/525
+        tree = etree.fromstring(xml_text).xpath(".")[0]
         ainfo = tree.xpath("/bs1770gain/album/summary")[0]
         album_gain = float(ainfo.xpath("./integrated/@lu")[0])
         album_peak = float(ainfo.xpath("./sample-peak/@factor")[0])

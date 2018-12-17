@@ -14,7 +14,7 @@ from rganalysis import *
 from rganalysis.common import logger
 from rganalysis.backends import get_backend, known_backends, BackendUnavailableException
 
-def tqdm_fake(iterable: Iterable, *args, **kwargs) -> Iterable:
+def tqdm_fake(iterable: Iterable, *args: Any, **kwargs: Any) -> Iterable:
     return iterable
 
 def default_job_count() -> int:
@@ -25,7 +25,7 @@ def default_job_count() -> int:
 
 class PickleableMethodCaller(object):
     '''Pickleable method caller for multiprocessing.Pool.imap'''
-    def __init__(self, method_name: str, *args , **kwargs) -> None:
+    def __init__(self, method_name: str, *args: Any , **kwargs: Any) -> None:
         self.method_name = method_name
         self.args = args
         self.kwargs = kwargs
@@ -102,7 +102,7 @@ def main(force_reanalyze: bool = False,
          quiet: bool = False,
          verbose: bool = False,
          *music_dir: str,
-         ):
+         ) -> None:
     '''Add replaygain tags to your music files.'''
 
     try:
@@ -128,8 +128,8 @@ def main(force_reanalyze: bool = False,
             except BackendUnavailableException as ex:
                 backend_exceptions.append(ex)
         else:
-            for ex in backend_exceptions:
-                logger.error(ex.args[0])
+            for exc in backend_exceptions:
+                logger.error(exc.args[0])
             logger.error('Could not find any usable backends. Perhaps you have not installed the prerequisites?')
             sys.exit(1)
     else:
@@ -169,12 +169,12 @@ def main(force_reanalyze: bool = False,
     # Wrapper that runs the handler in a subprocess, allowing for
     # parallel operation
     def wrapped_handler(track_set: RGTrackSet) -> RGTrackSet:
-        p = Process(target=handler, args=(track_set,)) # type: ignore # https://github.com/python/mypy/issues/797
+        p = Process(target=handler, args=(track_set,))
         try:
             p.start()
             p.join()
-            if p.exitcode != 0:  # type: ignore
-                logger.error("Subprocess exited with code %s for %s", p.exitcode, track_set.track_set_key_string())  # type: ignore
+            if p.exitcode != 0:
+                logger.error("Subprocess exited with code %s for %s", p.exitcode, track_set.track_set_key_string())
         finally:
             if p.is_alive():
                 logger.debug("Killing subprocess")
@@ -185,12 +185,12 @@ def main(force_reanalyze: bool = False,
     try:
         if jobs <= 1:
             # Sequential
-            handled_track_sets = map(handler, track_sets) # type: ignore # https://github.com/python/mypy/issues/797
+            handled_track_sets = map(handler, track_sets)
         else:
             # Parallel (Using process pool doesn't work, so instead we
             # use Process instance within each thread)
             pool = ThreadPool(jobs)
-            handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets) # type: ignore # https://github.com/python/typeshed/issues/683
+            handled_track_sets = pool.imap_unordered(wrapped_handler, track_sets)
         # Wait for completion
         iter_len = None if low_memory else len(cast(Sized, track_sets))
         for ts in tqdm(handled_track_sets, total=iter_len, desc="Analyzing"):

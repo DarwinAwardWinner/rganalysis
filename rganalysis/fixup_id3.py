@@ -25,7 +25,7 @@ def fixup_ID3(fname: Union[str, MusicFileType]) -> None:
     '''
     # Make sure we have the non-easy variant.
     if isinstance(fname, MusicFileType):
-        fname = fname.filename  # type: ignore
+        fname = fname.filename
     track = MusicFile(fname, easy=False)
     # Only operate on ID3
     if not isinstance(track, id3.ID3FileType):
