@@ -96,7 +96,6 @@ class RGTrack(object):
         tags are not checked for accuracy, only existence.'''
         return self.gain is not None and self.peak is not None
 
-
     def track_set_key(self) -> Tuple:
         '''Return a tuple that uniquely identifies the track's "album".
 
