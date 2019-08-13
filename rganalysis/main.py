@@ -6,6 +6,7 @@ import multiprocessing
 import plac
 import traceback
 import logging
+import sys
 
 from multiprocessing import Process
 from multiprocessing.pool import ThreadPool

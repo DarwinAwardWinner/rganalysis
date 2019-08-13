@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of version 2 (or later) of the GNU General Public
 # License as published by the Free Software Foundation.
@@ -10,7 +8,6 @@ from typing import (
 
 import os.path
 import re
-import sys
 
 from itertools import groupby
 from mutagen import File as MusicFile
@@ -37,19 +34,6 @@ for tag in rg_tags:
 def fullpath(f: str) -> str:
     '''os.path.realpath + expanduser'''
     return os.path.realpath(os.path.expanduser(f))
-
-def Property(function: Callable) -> Callable:
-    keys = 'fget', 'fset', 'fdel'
-    func_locals = {'doc':function.__doc__}
-    def probe_func(frame, event, arg): # type: ignore
-        if event == 'return':
-            locals = frame.f_locals
-            func_locals.update(dict((k,locals.get(k)) for k in keys))
-            sys.settrace(None)
-        return probe_func
-    sys.settrace(probe_func)
-    function()
-    return property(**func_locals) # type: ignore
 
 def get_multi(d: Dict[Any, Any], keys: Iterable[Any], default: Any = None) -> Any:
     '''Like "dict.get", but keys is a list of keys to try.
@@ -133,110 +117,109 @@ class RGTrack(object):
             dirname=dirname,
             ftype=classname)
 
-    @Property
-    def gain():                 # type: ignore
-        doc = '''Track gain value, or None if the track does not have replaygain tags.
+    def _get_gain(self) -> Optional[float]:
+        '''Track gain value, or None if the track does not have replaygain tags.
 
-        Gain values are generally stored rounded to 2 decimal places,
-        so you should not expect to get exactly the same value out as
-        you put in.'''
-        tag = 'replaygain_track_gain'
-        def fget(self: 'RGTrack') -> Optional[float]:
-            try:
-                tval = self.track[tag][0]
-                gain = parse_gain(tval)
-                return gain
-            except (KeyError, ValueError):
-                return None
-        def fset(self: 'RGTrack', value: float) -> None:
-            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            if value is None:
-                del self.gain
-            else:
-                self.track[tag] = format_gain(value)
-        def fdel(self: 'RGTrack') -> None:
-            if tag in self.track.keys():
-                del self.track[tag]
+     Gain values are generally stored rounded to 2 decimal places, so
+     you should not expect to get exactly the same value out as you
+     put in.
 
-    @Property
-    def peak():                 # type: ignore
-        doc = '''Track peak dB, or None if the track does not have replaygain tags.
+        '''
+        try:
+            tval = self.track['replaygain_track_gain'][0]
+            gain = parse_gain(tval)
+            return gain
+        except (KeyError, ValueError):
+            return None
+    def _set_gain(self, value: float) -> None:
+        logger.debug("Setting %s to %s for %s" % ('replaygain_track_gain', value, self.filename))
+        if value is None:
+            del self.gain
+        else:
+            self.track['replaygain_track_gain'] = format_gain(value)
+    def _del_gain(self) -> None:
+        if 'replaygain_track_gain' in self.track.keys():
+            del self.track['replaygain_track_gain']
+    gain = property(_get_gain, _set_gain, _del_gain)
 
-        Peak values are generally stored rounded to 6 decimal places,
-        so you should not expect to get exactly the same value out as
-        you put in.'''
-        tag = 'replaygain_track_peak'
-        def fget(self: 'RGTrack') -> Optional[float]:
-            try:
-                tval = self.track[tag][0]
-                peak = parse_peak(tval)
-                return peak
-            except (KeyError, ValueError):
-                return None
-        def fset(self: 'RGTrack', value: float) -> None:
-            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            if value is None:
-                del self.peak
-            else:
-                self.track[tag] = format_peak(value)
-        def fdel(self: 'RGTrack') -> None:
-            if tag in self.track.keys():
-                del self.track[tag]
-
-    @Property
-    def album_gain():           # type: ignore
-        doc = '''Album gain value, or None if the album does not have replaygain tags.
-
-        Gain values are generally stored rounded to 2 decimal places,
-        so you should not expect to get exactly the same value out as
-        you put in.'''
-        tag = 'replaygain_album_gain'
-        def fget(self: 'RGTrack') -> Optional[float]:
-            try:
-                tval = self.track[tag][0]
-                gain = parse_gain(tval)
-                return gain
-            except (KeyError, ValueError):
-                return None
-        def fset(self: 'RGTrack', value: float) -> None:
-            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            if value is None:
-                del self.album_gain
-            else:
-                self.track[tag] = format_gain(value)
-        def fdel(self: 'RGTrack') -> None:
-            if tag in self.track.keys():
-                del self.track[tag]
-
-    @Property
-    def album_peak():           # type: ignore
-        doc = '''Album peak dB, or None if the album does not have replaygain tags.
+    def _get_peak(self) -> Optional[float]:
+        '''Track peak dB, or None if the track does not have replaygain tags.
 
         Peak values are generally stored rounded to 6 decimal places,
         so you should not expect to get exactly the same value out as
-        you put in.'''
-        tag = 'replaygain_album_peak'
-        def fget(self: 'RGTrack') -> Optional[float]:
-            try:
-                tval = self.track[tag][0]
-                peak = parse_peak(tval)
-                return peak
-            except (KeyError, ValueError):
-                return None
-        def fset(self: 'RGTrack', value: float) -> None:
-            logger.debug("Setting %s to %s for %s" % (tag, value, self.filename))
-            if value is None:
-                del self.album_peak
-            else:
-                self.track[tag] = format_peak(value)
-        def fdel(self: 'RGTrack') -> None:
-            if tag in self.track.keys():
-                del self.track[tag]
+        you put in.
 
-    @Property
-    def length_seconds():       # type: ignore
-        def fget(self: 'RGTrack') -> float:
-            return self.track.info.length
+        '''
+        try:
+            tval = self.track['replaypeak_track_peak'][0]
+            peak = parse_peak(tval)
+            return peak
+        except (KeyError, ValueError):
+            return None
+    def _set_peak(self, value: float) -> None:
+        logger.debug("Setting %s to %s for %s" % ('replaypeak_track_peak', value, self.filename))
+        if value is None:
+            del self.peak
+        else:
+            self.track['replaypeak_track_peak'] = format_peak(value)
+    def _del_peak(self) -> None:
+        if 'replaypeak_track_peak' in self.track.keys():
+            del self.track['replaypeak_track_peak']
+    peak = property(_get_peak, _set_peak, _del_peak)
+
+    def _get_album_gain(self) -> Optional[float]:
+        '''Album gain value, or None if the track does not have replaygain album tags.
+
+        Gain values are generally stored rounded to 2 decimal places,
+        so you should not expect to get exactly the same value out as
+        you put in.
+
+        '''
+        try:
+            tval = self.track['replaygain_album_gain'][0]
+            gain = parse_gain(tval)
+            return gain
+        except (KeyError, ValueError):
+            return None
+    def _set_album_gain(self, value: float) -> None:
+        logger.debug("Setting %s to %s for %s" % ('replaygain_album_gain', value, self.filename))
+        if value is None:
+            del self.gain
+        else:
+            self.track['replaygain_album_gain'] = format_gain(value)
+    def _del_album_gain(self) -> None:
+        if 'replaygain_album_gain' in self.track.keys():
+            del self.track['replaygain_album_gain']
+    album_gain = property(_get_album_gain, _set_album_gain, _del_album_gain)
+
+    def _get_album_peak(self) -> Optional[float]:
+        '''Album peak dB, or None if the track does not have replaygain album tags.
+
+        Peak values are generally stored rounded to 6 decimal places,
+        so you should not expect to get exactly the same value out as
+        you put in.
+
+        '''
+        try:
+            tval = self.track['replaypeak_album_peak'][0]
+            peak = parse_peak(tval)
+            return peak
+        except (KeyError, ValueError):
+            return None
+    def _set_album_peak(self, value: float) -> None:
+        logger.debug("Setting %s to %s for %s" % ('replaypeak_album_peak', value, self.filename))
+        if value is None:
+            del self.peak
+        else:
+            self.track['replaypeak_album_peak'] = format_peak(value)
+    def _del_album_peak(self) -> None:
+        if 'replaypeak_album_peak' in self.track.keys():
+            del self.track['replaypeak_album_peak']
+    album_peak = property(_get_album_peak, _set_album_peak, _del_album_peak)
+
+    @property
+    def length_seconds(self) -> float:
+        return self.track.info.length
 
     def cleanup_tags(self) -> None:
         '''Delete any ReplayGain tags from track.
@@ -270,7 +253,7 @@ class RGTrack(object):
             (tgain, tpeak, again, apeak) = \
                 (self.gain, self.peak, self.album_gain, self.album_peak)
             self.cleanup_tags()
-            (self.gain, self.peak, self.album_gain, self.album_peak) = (tgain, tpeak, again, apeak) # type: ignore
+            (self.gain, self.peak, self.album_gain, self.album_peak) = (tgain, tpeak, again, apeak)
         self.track.save()
         if fixup_id3:
             fixup_ID3(self.filename)
@@ -355,43 +338,46 @@ class RGTrackSet(object):
             # Single track(s), so no album gain
             return False
 
-    @Property
-    def gain():                 # type: ignore
-        doc = '''Album gain value, or None if tracks do not all agree on it.
+    def _get_gain(self) -> Optional[float]:
+        '''Album gain value, or None if tracks do not all agree on it.
 
         Gain values are generally stored rounded to 2 decimal places,
         so you should not expect to get exactly the same value out as
-        you put in.'''
-        def fget(self: 'RGTrackSet') -> Optional[float]:
-            try:
-                return self._get_common_value_for_all_tracks(lambda t: t.album_gain)
-            except (TypeError, ValueError, KeyError):
-                return None
-        def fset(self: 'RGTrackSet', value: float) -> None:
-            for t in self.RGTracks.values():
-                t.album_gain = value # type:ignore
-        def fdel(self: 'RGTrackSet') -> None:
-            for t in self.RGTracks.values():
-                del t.album_gain
+        you put in.
 
-    @Property
-    def peak():                 # type: ignore
-        doc = '''Album peak value, or None if tracks do not all agree on it.
+        '''
+        try:
+            return self._get_common_value_for_all_tracks(lambda t: t.album_gain)
+        except (TypeError, ValueError, KeyError):
+            return None
+    def _set_gain(self, value: float) -> None:
+        for t in self.RGTracks.values():
+            t.album_gain = value
+    def _del_gain(self) -> None:
+        for t in self.RGTracks.values():
+            del t.album_gain
+    gain = property(_get_gain, _set_gain, _del_gain)
+
+    def _get_peak(self) -> Optional[float]:
+        '''Album peak value, or None if tracks do not all agree on it.
 
         Peak values are generally stored rounded to 6 decimal places,
         so you should not expect to get exactly the same value out as
-        you put in.'''
-        def fget(self: 'RGTrackSet') -> Optional[float]:
-            try:
-                return self._get_common_value_for_all_tracks(lambda t: t.album_peak)
-            except (TypeError, ValueError, KeyError):
-                return None
-        def fset(self: 'RGTrackSet', value: float) -> None:
-            for t in self.RGTracks.values():
-                t.album_peak = value # type:ignore
-        def fdel(self: 'RGTrackSet') -> None:
-            for t in self.RGTracks.values():
-                del t.album_peak
+        you put in.
+
+        '''
+        try:
+            return self._get_common_value_for_all_tracks(lambda t: t.album_peak)
+        except (TypeError, ValueError, KeyError):
+            return None
+    def _set_peak(self, value: float) -> None:
+        for t in self.RGTracks.values():
+            t.album_peak = value
+    def _del_peak(self) -> None:
+        for t in self.RGTracks.values():
+            del t.album_peak
+    peak = property(_get_peak, _set_peak, _del_peak)
+
 
     def track_set_key(self) -> Tuple:
         return next(iter(self.RGTracks.values())).track_set_key()
@@ -473,11 +459,11 @@ class RGTrackSet(object):
         for fname in self.RGTracks.keys():
             track = self.RGTracks[fname]
             track_rginfo = rginfo[fname]
-            (track.gain, track.peak) = (track_rginfo["replaygain_track_gain"], track_rginfo["replaygain_track_peak"]) # type: ignore
+            (track.gain, track.peak) = (track_rginfo["replaygain_track_gain"], track_rginfo["replaygain_track_peak"])
         # Set or unset album gain
         if gain_type == "album":
             album_rginfo = next(iter(rginfo.values()))
-            (self.gain, self.peak) = (track_rginfo["replaygain_album_gain"], track_rginfo["replaygain_album_peak"]) # type: ignore
+            (self.gain, self.peak) = (track_rginfo["replaygain_album_gain"], track_rginfo["replaygain_album_peak"])
         else:
             del self.gain
             del self.peak
