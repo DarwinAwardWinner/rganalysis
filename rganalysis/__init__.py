@@ -15,6 +15,7 @@ import sys
 from itertools import groupby
 from mutagen import File as MusicFile
 from mutagen import FileType as MusicFileType
+from mutagen import MutagenError
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
 
@@ -587,25 +588,6 @@ def remove_redundant_paths(paths: Iterable[str]) -> Iterable[str]:
             yield p
             seen_paths.add(p)
 
-def is_music_file(file: str) -> bool:
-    # Exists?
-    if not os.path.exists(file):
-        logger.debug("File %s does not exist", repr(file))
-        return False
-    if not os.path.getsize(file) > 0:
-        logger.debug("File %s has zero size", repr(file))
-        return False
-    # Readable by Mutagen?
-    try:
-        if not MusicFile(file):
-            logger.debug("File %s is not recognized by Mutagen", repr(file))
-            return False
-    except Exception:
-        logger.debug("File %s is not recognized", repr(file))
-        return False
-    # OK!
-    return True
-
 def get_all_music_files (paths: Iterable[str], ignore_hidden: bool = True) -> Iterable[MusicFileType]:
     '''Recursively search in one or more paths for music files.
 
@@ -622,9 +604,19 @@ def get_all_music_files (paths: Iterable[str], ignore_hidden: bool = True) -> It
                     # Modify dirs in place to cut off os.walk
                     dirs[:] = list(remove_hidden_paths(dirs))
                     files = remove_hidden_paths(files)
-                files = filter(lambda f: is_music_file(os.path.join(root, f)), files)
                 for f in files:
-                    yield MusicFile(os.path.join(root, f), easy=True)
+                    path = os.path.join(root, f)
+                    try:
+                        mf = MusicFile(path, easy=True)
+                        if mf:
+                            logger.debug('Found music file %s', repr(path))
+                            yield mf
+                        else:
+                            logger.debug('File %s is not recognized as a music file by Mutagen', repr(path))
+                    except MutagenError as exc:
+                        logger.debug('Mutagen could not load file %s', repr(path), exc_info = exc)
+                    except Exception as exc:
+                        logger.debug('File %s skipped due to unknown error', repr(path), exc_info = exc)
         else:
             logger.debug("Checking for music files at %s", repr(p))
             f = MusicFile(p, easy=True)
