@@ -11,6 +11,7 @@ $SCRIPT --help &>/dev/null || {
     exit 1
 }
 
+# This inserts the new help text into the README file
 {
   # Before
   perl -lape 'do { print; exit; } if /<pre><code>/' README.mkdn
