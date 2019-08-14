@@ -398,7 +398,6 @@ class RGTrackSet(object):
             del t.album_peak
     peak = property(_get_peak, _set_peak, _del_peak)
 
-
     def track_set_key(self) -> Tuple:
         return next(iter(self.RGTracks.values())).track_set_key()
 
@@ -429,10 +428,10 @@ class RGTrackSet(object):
         '''
         try:
             # Will raise KeyError on missing tag
-            return self._get_common_value_for_all_tracks(lambda t: t[tag])
+            return self._get_common_value_for_all_tracks(lambda t: t.track[tag])
         # More informative error message
         except ValueError:
-            tag_values = { t[tag] for t in self.RGTracks } # type: ignore
+            tag_values = { t.track[tag] for t in self.RGTracks }
             raise ValueError("Tracks have different values for {!r} tag: {!r}".format(tag, tag_values))
 
     def _set_tag(self, tag: str, value: Any) -> None:
