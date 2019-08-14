@@ -224,6 +224,12 @@ class RGTrack(object):
     def cleanup_tags(self) -> None:
         '''Delete any ReplayGain tags from track.
 
+        This is an important step before saving new ReplayGain
+        information, because some music formats have multiple ways to
+        save ReplayGain information, so merely writing new tags would
+        have the potential to leave some old tags lying around with
+        conflicting information.
+
         This dicards any unsaved changes, then modifies and saves the
         track's tags on disk and then reloads the new tags from
         disk.
@@ -252,6 +258,17 @@ class RGTrack(object):
         self.track = new_track
 
     def save(self, cleanup: bool = True, fixup_id3: bool = True) -> None:
+        '''Save currently set ReplayGain tags to the file on disk.
+
+        If cleanup is True (the default), any existing ReplayGain tags
+        will first be deleted, to ensure that no old conflicting tags
+        can stck around after writing the new values.
+
+        If fixup_id3 is True (the default), ensure that ReplayGain
+        tags are saved to TXXX tags as well as RVA2 tags. If you don't
+        know what that means, stick with the default.
+
+        '''
         if cleanup:
             (tgain, tpeak, again, apeak) = \
                 (self.gain, self.peak, self.album_gain, self.album_peak)

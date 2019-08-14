@@ -9,8 +9,14 @@ from rganalysis.common import format_gain, format_peak
 def fixup_ID3(fname: Union[str, MusicFileType]) -> None:
     '''Convert RVA2 tags to TXXX:replaygain_* tags.
 
-    Argument should be an MusicFile (instance of mutagen.FileType) or
-    a string, which will be loaded by mutagen.MusicFile. If it is an
+    Mutagen's EasyID3 class saves ReplayGain info to RVA2 tags, but
+    some music players look in TXXX:replaygain_* tags instead. This
+    function extracts the RVA2 ReplayGain info, reformats it, and
+    stores it in the appropriate TXXX tags, so that all music playes
+    should be happy.
+
+    Argument should be a MusicFile (instance of mutagen.FileType) or a
+    string, which will be loaded by mutagen.MusicFile. If it is an
     instance of mutagen.id3.ID3FileType, the ReplayGain information in
     the RVA2 tags (if any) will be propagated to 'TXXX:replaygain_*'
     tags. Thus the resulting file will have the ReplayGain information
