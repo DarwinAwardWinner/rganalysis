@@ -151,20 +151,20 @@ class RGTrack(object):
 
         '''
         try:
-            tval = self.track['replaypeak_track_peak'][0]
+            tval = self.track['replaygain_track_peak'][0]
             peak = parse_peak(tval)
             return peak
         except (KeyError, ValueError):
             return None
     def _set_peak(self, value: float) -> None:
-        logger.debug("Setting %s to %s for %s" % ('replaypeak_track_peak', value, self.filename))
+        logger.debug("Setting %s to %s for %s" % ('replaygain_track_peak', value, self.filename))
         if value is None:
             del self.peak
         else:
-            self.track['replaypeak_track_peak'] = format_peak(value)
+            self.track['replaygain_track_peak'] = format_peak(value)
     def _del_peak(self) -> None:
-        if 'replaypeak_track_peak' in self.track.keys():
-            del self.track['replaypeak_track_peak']
+        if 'replaygain_track_peak' in self.track.keys():
+            del self.track['replaygain_track_peak']
     peak = property(_get_peak, _set_peak, _del_peak)
 
     def _get_album_gain(self) -> Optional[float]:
@@ -201,20 +201,20 @@ class RGTrack(object):
 
         '''
         try:
-            tval = self.track['replaypeak_album_peak'][0]
+            tval = self.track['replaygain_album_peak'][0]
             peak = parse_peak(tval)
             return peak
         except (KeyError, ValueError):
             return None
     def _set_album_peak(self, value: float) -> None:
-        logger.debug("Setting %s to %s for %s" % ('replaypeak_album_peak', value, self.filename))
+        logger.debug("Setting %s to %s for %s" % ('replaygain_album_peak', value, self.filename))
         if value is None:
             del self.peak
         else:
-            self.track['replaypeak_album_peak'] = format_peak(value)
+            self.track['replaygain_album_peak'] = format_peak(value)
     def _del_album_peak(self) -> None:
-        if 'replaypeak_album_peak' in self.track.keys():
-            del self.track['replaypeak_album_peak']
+        if 'replaygain_album_peak' in self.track.keys():
+            del self.track['replaygain_album_peak']
     album_peak = property(_get_album_peak, _set_album_peak, _del_album_peak)
 
     @property
@@ -233,6 +233,9 @@ class RGTrack(object):
         tags_to_clean.update('QuodLibet::' + tag for tag in rg_tags)
         tags_to_clean.update('TXXX:' + tag for tag in rg_tags)
         tags_to_clean.update(['RVA2:track', 'RVA2:album'])
+        # A previous version had a typo that caused it to add these
+        # tags. See ea9335d600e97b1f78c31030ef7620eddfc10bd2.
+        tags_to_clean.update(['replaypeak_track_peak', 'replaypeak_album_peak'])
         tags_to_clean = { tag.lower() for tag in tags_to_clean }
         # Need a non-easy interface for proper ID3 cleanup
         t = MusicFile(self.filename, easy=False)
