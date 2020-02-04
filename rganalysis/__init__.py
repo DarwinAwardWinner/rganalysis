@@ -475,14 +475,13 @@ class RGTrackSet(object):
             logger.info('Analyzing track set %s', repr(self.track_set_key_string()))
         rginfo = self.gain_backend.compute_gain(self.filenames)
         # Save track gains
-        for fname in self.RGTracks.keys():
-            track = self.RGTracks[fname]
+        for fname, track in self.RGTracks.items():
             track_rginfo = rginfo[fname]
             (track.gain, track.peak) = (track_rginfo["replaygain_track_gain"], track_rginfo["replaygain_track_peak"])
         # Set or unset album gain
         if gain_type == "album":
             album_rginfo = next(iter(rginfo.values()))
-            (self.gain, self.peak) = (track_rginfo["replaygain_album_gain"], track_rginfo["replaygain_album_peak"])
+            (self.gain, self.peak) = (album_rginfo["replaygain_album_gain"], album_rginfo["replaygain_album_peak"])
         else:
             del self.gain
             del self.peak
