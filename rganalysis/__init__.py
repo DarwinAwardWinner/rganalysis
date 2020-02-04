@@ -274,6 +274,7 @@ class RGTrack(object):
                 (self.gain, self.peak, self.album_gain, self.album_peak)
             self.cleanup_tags()
             (self.gain, self.peak, self.album_gain, self.album_peak) = (tgain, tpeak, again, apeak)
+        logger.debug("Saving replaygain info to track file {}".format(repr(self.filename)))
         self.track.save()
         if fixup_id3:
             fixup_ID3(self.filename)
