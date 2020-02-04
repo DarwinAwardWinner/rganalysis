@@ -17,7 +17,7 @@ from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
 
 from rganalysis.common import logger, format_gain, format_peak, parse_gain, parse_peak
-from rganalysis.backends import GainComputer
+from rganalysis.backends import GainComputer, get_default_backend
 from rganalysis.fixup_id3 import fixup_ID3
 
 rg_tags = (
@@ -293,16 +293,16 @@ class RGTrackSet(object):
 
     track_gain_signal_filenames = ('TRACKGAIN', '.TRACKGAIN', '_TRACKGAIN') # type: Sequence[str]
 
-    def __init__(self, tracks: Iterable[RGTrack], gain_backend: GainComputer, gain_type: str = "auto") -> None:
+    def __init__(self, tracks: Iterable[RGTrack], gain_backend: Optional[GainComputer] = None, gain_type: str = "auto") -> None:
         self.RGTracks = { str(t.filename): t for t in tracks }
         if len(self.RGTracks) < 1:
             raise ValueError("Track set must contain at least one track")
         keys = set(t.track_set_key() for t in self.RGTracks.values())
         if (len(keys) != 1):
             raise ValueError("All tracks in an album must have the same key")
-        if not isinstance(gain_backend, GainComputer):
+        if gain_backend and not isinstance(gain_backend, GainComputer):
             raise ValueError("Gain backend must be a GainComputer instance")
-        self.gain_backend = gain_backend
+        self.gain_backend = gain_backend or get_default_backend()
         self.gain_type = gain_type
 
         self.filenames = sorted(self.RGTracks.keys())
