@@ -1,4 +1,4 @@
-from typing import Dict, Iterable
+from typing import Dict, Iterable, List
 
 from abc import ABCMeta, abstractmethod
 from importlib import import_module
@@ -50,13 +50,14 @@ class GainComputer(metaclass=ABCMeta):
         '''
         raise NotImplementedError("This method should be overridden in a subclass")
 
+    @abstractmethod
     def supports_file(self, fname: str) -> bool:
         raise NotImplementedError("This method should be overridden in a subclass")
 
 backends = {}                   # type: Dict[str, GainComputer]
 
 def register_backend(name: str, obj: GainComputer) -> None:
-    '''Backends modules should call this to register a GainComputer object.'''
+    '''Backend modules should call this to register a GainComputer object.'''
     if not isinstance(obj, GainComputer):
         raise TypeError("Backend must be a GainComputer instance.")
     logger.debug("Registering backend %s: %s", name, repr(obj))
@@ -68,6 +69,8 @@ def get_backend(name: str) -> GainComputer:
     If NAME is not registered as a backend, raises BackendUnavailableException.
 
     '''
+    if name == 'auto':
+        return get_default_backend()
     try:
         return backends[name]
     except KeyError:
@@ -84,6 +87,28 @@ def get_backend(name: str) -> GainComputer:
             raise BackendUnavailableException("Could not import the {modname} module for backend {name}".format(**locals()))
         except KeyError:
             raise BackendUnavailableException("Module {modname} was imported, but did not register a backend named {name}".format(**locals()))
+
+def get_backend_name(obj: GainComputer) -> str:
+    '''Return the name of a GainComputer instance, if possible.
+
+    If the GainComputer instance is registered, the registered name
+    will be returned. Otherwise, the name of a registered instance of
+    the same class will be returned. As a last resort, the name of the
+    class itself will be returned.
+
+    '''
+    if not isinstance(obj, GainComputer):
+        raise TypeError("Backend must be a GainComputer instance.")
+    same_class_name = None
+    for name, backend in backends.items():
+        if obj == backend:
+            return name
+        elif not same_class_name and type(obj) == type(backend):
+            same_class_name = name
+    if same_class_name:
+        return same_class_name
+    else:
+        return type(obj).__name__
 
 class NullGainComputer(GainComputer):
     '''The null gain computer supports no files.'''
@@ -103,3 +128,17 @@ register_backend('null', NullGainComputer())
 
 # Used to select a backend for  '--backend=auto'
 known_backends = ('audiotools', 'bs1770gain')
+
+def get_default_backend() -> GainComputer:
+    backend_exceptions: List[BackendUnavailableException] = []
+    for bname in known_backends:
+        try:
+            gain_backend = get_backend(bname)
+            logger.debug('Selected default backend {}'.format(bname))
+            return gain_backend
+        except BackendUnavailableException as ex:
+            backend_exceptions.append(ex)
+    else:
+        for exc in backend_exceptions:
+            logger.error(exc.args[0])
+        raise BackendUnavailableException('Could not find any usable backends. Perhaps you have not installed the prerequisites?')

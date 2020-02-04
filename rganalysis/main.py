@@ -13,7 +13,7 @@ from multiprocessing.pool import ThreadPool
 
 from rganalysis import *
 from rganalysis.common import logger
-from rganalysis.backends import get_backend, known_backends, BackendUnavailableException
+from rganalysis.backends import get_backend, get_backend_name, BackendUnavailableException
 
 def tqdm_fake(iterable: Iterable, *args: Any, **kwargs: Any) -> Iterable:
     return iterable
@@ -119,27 +119,15 @@ def main(force_reanalyze: bool = False,
     else:
         logger.setLevel(logging.INFO)
 
-    if backend == 'auto':
-        backend_exceptions: List[BackendUnavailableException] = []
-        for bname in known_backends:
-            try:
-                gain_backend = get_backend(bname)
-                logger.info('Selected the {} backend to compute ReplayGain'.format(bname))
-                break
-            except BackendUnavailableException as ex:
-                backend_exceptions.append(ex)
-        else:
-            for exc in backend_exceptions:
-                logger.error(exc.args[0])
-            logger.error('Could not find any usable backends. Perhaps you have not installed the prerequisites?')
-            sys.exit(1)
-    else:
-        try:
-            gain_backend = get_backend(backend)
-            logger.info('Using the {} backend to compute ReplayGain'.format(backend))
-        except BackendUnavailableException as ex:
-            logger.error(ex.args[0])
-            sys.exit(1)
+    try:
+        gain_backend = get_backend(backend)
+        # If 'auto', we need to figure out which backend was
+        # auto-selected.
+        backend = get_backend_name(gain_backend)
+        logger.info('Using the {} backend to compute ReplayGain info'.format(backend))
+    except BackendUnavailableException as ex:
+        logger.error(ex.args[0])
+        sys.exit(1)
 
     track_constructor = RGTrack
     if dry_run:
