@@ -184,7 +184,7 @@ class RGTrack(object):
     def _set_album_gain(self, value: float) -> None:
         logger.debug("Setting %s to %s for %s" % ('replaygain_album_gain', value, self.filename))
         if value is None:
-            del self.gain
+            del self.album_gain
         else:
             self.track['replaygain_album_gain'] = format_gain(value)
     def _del_album_gain(self) -> None:
@@ -209,7 +209,7 @@ class RGTrack(object):
     def _set_album_peak(self, value: float) -> None:
         logger.debug("Setting %s to %s for %s" % ('replaygain_album_peak', value, self.filename))
         if value is None:
-            del self.peak
+            del self.album_peak
         else:
             self.track['replaygain_album_peak'] = format_peak(value)
     def _del_album_peak(self) -> None:
