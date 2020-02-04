@@ -431,7 +431,7 @@ class RGTrackSet(object):
             return self._get_common_value_for_all_tracks(lambda t: t.track[tag])
         # More informative error message
         except ValueError:
-            tag_values = { t.track[tag] for t in self.RGTracks }
+            tag_values = { t.track[tag] for t in self.RGTracks.values() }
             raise ValueError("Tracks have different values for {!r} tag: {!r}".format(tag, tag_values))
 
     def _set_tag(self, tag: str, value: Any) -> None:
