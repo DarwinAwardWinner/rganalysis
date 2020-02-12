@@ -49,15 +49,15 @@ def get_multi(d: Dict[Any, Any], keys: Iterable[Any], default: Any = None) -> An
     return default
 
 # Tag names copied from Quod Libet
-def get_album(mf: MusicFile) -> str:
+def get_album(mf: MusicFileType) -> str:
     return get_multi(mf, ("albumsort", "album"), [''])[0]
-def get_albumartist(mf: MusicFile) -> str:
+def get_albumartist(mf: MusicFileType) -> str:
     return get_multi(mf, ("albumartistsort", "albumartist", "artistsort", "artist"), [''])[0]
-def get_albumid(mf: MusicFile) -> str:
+def get_albumid(mf: MusicFileType) -> str:
     return get_multi(mf, ("album_grouping_key", "labelid", "musicbrainz_albumid"), [''])[0]
-def get_discnumber(mf: MusicFile) -> str:
+def get_discnumber(mf: MusicFileType) -> str:
     return mf.get("discnumber", [''])[0]
-def get_full_classname(mf: MusicFile) -> str:
+def get_full_classname(mf: MusicFileType) -> str:
     t = type(mf)
     return "{}.{}".format(t.__module__, t.__qualname__)
 
