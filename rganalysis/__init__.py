@@ -13,7 +13,6 @@ from itertools import groupby
 from mutagen import File as MusicFile
 from mutagen import FileType as MusicFileType
 from mutagen import MutagenError
-from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4Tags
 
 from rganalysis.common import logger, format_gain, format_peak, parse_gain, parse_peak
