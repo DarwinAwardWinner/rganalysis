@@ -33,5 +33,8 @@ class AudiotoolsGainComputer(GainComputer):
             return True
         except UnsupportedFile:
             return False
+        except InvalidFile as ex:
+            logger.error("Invalid file: %s. The exception was:\n%s" % (repr(fname), repr(ex)))
+            return False
 
 register_backend('audiotools', AudiotoolsGainComputer())
