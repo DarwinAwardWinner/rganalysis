@@ -5,7 +5,7 @@ from rganalysis.backends import GainComputer, register_backend, BackendUnavailab
 
 try:
     import audiotools
-    from audiotools import UnsupportedFile
+    from audiotools import UnsupportedFile, InvalidFile
 except ImportError as ex:
     raise BackendUnavailableException("Unable to use the audiotools backend: Could not load audiotools module. ")
 

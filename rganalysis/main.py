@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typing import Sized, List, Iterable
+from typing import Sized, Iterable, Any
 
 import multiprocessing
 import plac

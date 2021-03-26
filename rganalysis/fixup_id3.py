@@ -1,4 +1,4 @@
-from typing import Union, cast
+from typing import Union
 
 from mutagen import File as MusicFile
 from mutagen import FileType as MusicFileType

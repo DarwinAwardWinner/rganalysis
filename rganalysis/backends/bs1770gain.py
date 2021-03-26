@@ -2,12 +2,10 @@ from typing import Dict, Iterable, cast
 
 import os.path
 import sys
-import re
 
 from os import getenv
 from shutil import which
-from subprocess import Popen, PIPE, check_output, CalledProcessError
-from xml.sax.saxutils import quoteattr
+from subprocess import Popen, PIPE, CalledProcessError
 
 from rganalysis.common import logger
 from rganalysis.backends import GainComputer, register_backend, BackendUnavailableException

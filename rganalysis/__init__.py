@@ -496,7 +496,7 @@ class RGTrackSet(object):
         - the album consists of only one track;
         - the album is actually a collection of tracks that do not
           belong to any album.'''
-        if len(self.RGTracks) <= 1 or self.track_set_key()[0:1] is ('',''):
+        if len(self.RGTracks) <= 1 or self.track_set_key()[0:1] == ('',''):
             return False
         else:
             return True
